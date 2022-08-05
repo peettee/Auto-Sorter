@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using FMODUnity;
 using HarmonyLib;
+using pp.RaftMods.AutoSorter.Protocol;
 using Steamworks;
 using UnityEngine;
 
 namespace pp.RaftMods.AutoSorter
 {
     [DisallowMultipleComponent] //disallow to really make sure we never get into the situation of components being added twice on mod reload.
-    public class CStorageBehaviour : MonoBehaviour_ID_Network/*, IRaycastable*/
+    public class CStorageBehaviour : MonoBehaviour_ID_Network
     {
         private const int CREATIVE_INFINITE_COUNT = 2147483647;
         public const float DOWNGRADE_TIME_SECONDS = 3f;
@@ -19,8 +20,7 @@ namespace pp.RaftMods.AutoSorter
         public System.DateTime? LastCheck { get; private set; }
 
         private CAutoSorter mi_mod;
-        private CanvasHelper mi_canvas; 
-        private Semih_Network mi_network;
+        private Raft_Network mi_network;
         private Network_Player mi_localPlayer;
 
         private CSceneStorage mi_sceneStorage;
@@ -33,7 +33,6 @@ namespace pp.RaftMods.AutoSorter
         private Texture2D mi_originalTexture;
         private Texture2D mi_customTexture;
 
-        //private CUISorterInteractWindow mi_interactWindow;
         private CUISorterConfigDialog mi_configWindow;
 
         /// <summary>
@@ -45,29 +44,18 @@ namespace pp.RaftMods.AutoSorter
         {
             mi_mod                  = _mod;
             mi_sceneStorage         = _storage;
-            //mi_interactWindow       = _interactWindow;
             mi_configWindow         = _configDialog;
             mi_inventory            = mi_sceneStorage.StorageComponent.GetInventoryReference();
-            mi_network              = ComponentManager<Semih_Network>.Value;
+            mi_network              = ComponentManager<Raft_Network>.Value;
             mi_localPlayer          = mi_network.GetLocalPlayer();
             //use our block objects index so we receive RPC calls
             //need to use an existing blockindex as clients/host need to be aware of it
-            ObjectIndex = mi_sceneStorage.StorageComponent.ObjectIndex;
-            NetworkIDManager.AddNetworkID(this);
+            ObjectIndex             = mi_sceneStorage.StorageComponent.ObjectIndex;
+            CAutoSorter.Get.RegisterNetworkBehaviour(this);
 
-            if (!Semih_Network.IsHost) //request lantern states from host after load
+            if (!Raft_Network.IsHost)
             {
-                mi_network.SendP2P(
-                    mi_network.HostID,
-                    new Message_Battery_OnOff( //just use the battery message as it should never
-                        Messages.Battery_OnOff,
-                        mi_network.NetworkIDManager,
-                        mi_network.LocalSteamID,
-                        this.ObjectIndex,
-                        (int)EStorageRequestType.REQUEST_STATE, //we use the battery uses int to pass our custom command type 
-                        mi_sceneStorage.IsUpgraded), //doesnt matter
-                    EP2PSend.k_EP2PSendReliable,
-                    NetworkChannel.Channel_Game);
+                CAutoSorter.Get.SendTo(new CDTO(EStorageRequestType.REQUEST_STATE, ObjectIndex), mi_network.HostID);
             }
             else if (mi_mod.SavedStorageData.ContainsKey(SaveAndLoad.CurrentGameFileName))
             {
@@ -82,146 +70,110 @@ namespace pp.RaftMods.AutoSorter
             mi_loaded = true;
         }
 
-        public IEnumerator CheckItems() 
+        public IEnumerator CheckItems()
         {
-            if (!mi_sceneStorage.IsUpgraded || !HasInventorySpaceLeft) yield break;
-
-            LastCheck = System.DateTime.UtcNow;
-
-            Inventory targetInventory;
-            int targetItemCount;
-            int stackSize;
-            List<int> alreadyChecked;
-            foreach(var storage in mi_mod.SceneStorages)
+            if (mi_sceneStorage.IsUpgraded && HasInventorySpaceLeft)
             {
-                if (storage.IsUpgraded) continue;
+                LastCheck = System.DateTime.UtcNow;
 
-                alreadyChecked = new List<int>();
-                targetInventory = storage.StorageComponent.GetInventoryReference();
-
-                if (mi_sceneStorage.Data.AutoMode)
+                Inventory targetInventory;
+                int targetItemCount;
+                List<int> alreadyChecked;
+                foreach (var storage in mi_mod.SceneStorages)
                 {
-                    foreach (Slot slot in mi_inventory.allSlots)
+                    if (storage.IsUpgraded) continue;
+
+                    alreadyChecked = new List<int>();
+                    targetInventory = storage.StorageComponent.GetInventoryReference();
+
+                    if (mi_sceneStorage.Data.AutoMode)
+                    {
+                        foreach (Slot slot in mi_inventory.allSlots)
+                        {
+                            if (!slot.active ||
+                                !slot.HasValidItemInstance() ||
+                                slot.locked) continue;
+
+                            if (alreadyChecked.Contains(slot.itemInstance.UniqueIndex)) continue;
+
+                            alreadyChecked.Add(slot.itemInstance.UniqueIndex);
+
+                            targetItemCount = targetInventory.GetItemCount(slot.itemInstance.UniqueName);
+                            if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) continue;
+
+                            if (!HasInventorySpaceLeft) break;
+
+                            targetInventory.RemoveItem(slot.itemInstance.UniqueName, targetItemCount);
+                            CUtil.StackedAddInventory(mi_inventory, slot.itemInstance.UniqueName, targetItemCount);
+                            yield return new WaitForEndOfFrame();
+                        }
+                        continue;
+                    }
+                     
+                    foreach (Slot slot in targetInventory.allSlots)
                     {
                         if (!slot.active ||
                             !slot.HasValidItemInstance() ||
                             slot.locked) continue;
 
-                        if (alreadyChecked.Contains(slot.itemInstance.UniqueIndex)) continue;
+                        if (alreadyChecked.Contains(slot.itemInstance.UniqueIndex) ||
+                            !mi_sceneStorage.Data.Filters.ContainsKey(slot.itemInstance.UniqueIndex)) continue;
 
                         alreadyChecked.Add(slot.itemInstance.UniqueIndex);
 
-                        targetItemCount = targetInventory.GetItemCount(slot.itemInstance.UniqueName);
-                        if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) continue;
+                        var itemIdx = mi_sceneStorage.Data.Filters[slot.itemInstance.UniqueIndex];
+                        targetItemCount = targetInventory.GetItemCount(itemIdx.UniqueName);
 
-                        if (!HasInventorySpaceLeft) break;
-
-                        targetInventory.RemoveItem(slot.itemInstance.UniqueName, targetItemCount);
-                        CUtil.StackedAddInventory(mi_inventory, slot.itemInstance.UniqueName, targetItemCount);
-                        yield return new WaitForEndOfFrame();
-                    }
-                }
-                else
-                {
-                    foreach (var itemIdx in mi_sceneStorage.Data.Filters)
-                    {
-                        if (alreadyChecked.Contains(itemIdx.Key)) continue;
-
-                        alreadyChecked.Add(itemIdx.Key);
-
-                        var item = ItemManager.GetItemByIndex(itemIdx.Key);
-                        targetItemCount = targetInventory.GetItemCount(item);
-
-                        if (!itemIdx.Value.NoAmountControl)
+                        if (!itemIdx.NoAmountControl)
                         {
-                            targetItemCount = Mathf.Min(Mathf.Max(itemIdx.Value.MaxAmount - mi_inventory.GetItemCount(item), 0), targetItemCount);
+                            targetItemCount = Mathf.Min(Mathf.Max(itemIdx.MaxAmount - mi_inventory.GetItemCount(itemIdx.UniqueName), 0), targetItemCount);
                         }
 
                         if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) continue;
 
                         if (!HasInventorySpaceLeft) break;
 
-                        targetInventory.RemoveItem(item.UniqueName, targetItemCount);
-                        CUtil.StackedAddInventory(mi_inventory, item.UniqueName, targetItemCount);
+                        targetInventory.RemoveItem(itemIdx.UniqueName, targetItemCount);
+                        CUtil.StackedAddInventory(mi_inventory, itemIdx.UniqueName, targetItemCount);
+
                         yield return new WaitForEndOfFrame();
                     }
                 }
             }
         }
 
-        //public void OnIsRayed()
-        //{
-        //    //if (!mi_loaded) return;
-
-        //    //if (!mi_canvas)
-        //    //{
-        //    //    mi_canvas = ComponentManager<CanvasHelper>.Value;
-        //    //    return;
-        //    //}
-
-        //    //if (CanvasHelper.ActiveMenu == MenuType.None &&
-        //    //    !PlayerItemManager.IsBusy &&
-        //    //    mi_canvas.CanOpenMenu &&
-        //    //    Helper.LocalPlayerIsWithinDistance(transform.position, Player.UseDistance + 0.5f))
-        //    //{
-        //    //    if (Input.GetKeyDown(KeyCode.F))
-        //    //    {
-        //    //        mi_configWindow.Show(mi_sceneStorage);
-        //    //        return;
-        //    //    }
-        //    //}
-        //}
-
-        //public void OnRayEnter()
-        //{
-        //    if (mi_interactWindow)
-        //    {
-        //        mi_interactWindow.ShowStorage(mi_mod, this);
-        //    }
-        //}
-
-        //public void OnRayExit()
-        //{
-        //    if (mi_configWindow)
-        //    {
-        //        mi_configWindow.Hide();
-        //    }
-        //    if (mi_interactWindow)
-        //    {
-        //        mi_interactWindow.HideStorage();
-        //    }
-        //}
-
-        public override bool Deserialize(Message_NetworkBehaviour _msg, CSteamID _remoteID)
+        public void OnNetworkMessageReceived(CDTO _msg, CSteamID _remoteID)
         {
-            if (!mi_loaded) return base.Deserialize(_msg, _remoteID);
+            if (!mi_loaded)
+            {
+                CUtil.Log("Not loaded");
+                return;
+            }
 
-            Messages type = _msg.Type;
-            if (_msg.Type != Messages.Battery_OnOff) return base.Deserialize(_msg, _remoteID);
-
-            Message_Battery_OnOff msg = _msg as Message_Battery_OnOff;
-            if (msg == null) return base.Deserialize(_msg, _remoteID);
-
-            switch ((EStorageRequestType)msg.batteryUsesLeft) //we use the usesleft value as our command type carrier
+            switch (_msg.Type) //we use the usesleft value as our command type carrier
             {
                 case EStorageRequestType.REQUEST_STATE:  //a client block requested this blocks state, send it back
-                    if (Semih_Network.IsHost)
+                    if (Raft_Network.IsHost)
                     {
-                        if (!mi_sceneStorage.IsUpgraded) return true;
+                        if (!mi_sceneStorage.IsUpgraded) return;
 
-                        mi_network.SendP2P(
-                            _remoteID,
-                            new Message_Battery_OnOff(Messages.Battery_OnOff, mi_network.NetworkIDManager, mi_network.LocalSteamID, this.ObjectIndex, (int)EStorageRequestType.TOGGLE, true),
-                            EP2PSend.k_EP2PSendReliable,
-                            NetworkChannel.Channel_Game);
+                        CAutoSorter.Get.SendTo(new CDTO(EStorageRequestType.RESPOND_STATE, ObjectIndex) { Info = mi_sceneStorage.Data }, _remoteID);
                     }
-                    return true;
-                case EStorageRequestType.TOGGLE:
-                    mi_sceneStorage.Data = ((_msg as Message_Battery_OnOff)?.on ?? false) ? new CStorageData(_msg.ObjectIndex) : null;
+                    break;
+                case EStorageRequestType.RESPOND_STATE:
+                    if (_msg.Info == null)
+                    {
+                        CUtil.LogW("Invalid storage info received. Update the AutoSorter mod.");
+                        return;
+                    }
+                    mi_sceneStorage.Data = _msg.Info;
                     UpdateStorageMaterials();
-                    return true;
+                    return;
+                case EStorageRequestType.UPGRADE:
+                    mi_sceneStorage.Data = _msg.Upgrade ? new CStorageData(_msg.ObjectIndex) : null;
+                    UpdateStorageMaterials();
+                    return;
             }
-            return true;
         }
 
         public bool Upgrade()
@@ -245,7 +197,6 @@ namespace pp.RaftMods.AutoSorter
             UpdateStorageMaterials();
             SendUpgradeState(true);
             RuntimeManager.PlayOneShot(Traverse.Create(mi_sceneStorage.StorageComponent).Field("eventRef_open").GetValue<string>(), transform.position);
-            CUtil.Log("Upgraded " + ObjectIndex);
             return true;
         }
 
@@ -269,6 +220,12 @@ namespace pp.RaftMods.AutoSorter
         protected override void OnDestroy()
         {
             base.OnDestroy();
+
+            if (CAutoSorter.Get != null)
+            {
+                CAutoSorter.Get.UnregisterNetworkBehaviour(this);
+            }
+
             if (mi_customTexture)
             {
                 Destroy(mi_customTexture);
@@ -315,23 +272,10 @@ namespace pp.RaftMods.AutoSorter
                 rend.materials = materials;
             }
         }
-        
+
         private void SendUpgradeState(bool _isUpgraded)
         {
-            var netMsg = new Message_Battery_OnOff(
-                        Messages.Battery_OnOff,
-                        RAPI.GetLocalPlayer().Network.NetworkIDManager,
-                        RAPI.GetLocalPlayer().steamID,
-                        ObjectIndex,
-                        (int)EStorageRequestType.TOGGLE,
-                        _isUpgraded);
-
-            if (Semih_Network.IsHost)
-            {
-                mi_network.RPC(netMsg, Target.Other, EP2PSend.k_EP2PSendReliable, NetworkChannel.Channel_Game);
-                return;
-            }
-            mi_network.SendP2P(mi_network.HostID, netMsg, EP2PSend.k_EP2PSendReliable, NetworkChannel.Channel_Game);
+            CAutoSorter.Get.Broadcast(new CDTO(EStorageRequestType.UPGRADE, ObjectIndex) { Upgrade = _isUpgraded }); ;
         }
 
         //private void OnGUI()

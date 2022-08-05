@@ -3,6 +3,7 @@
     public enum EStorageRequestType
     {
         REQUEST_STATE   = -41,
-        TOGGLE          = -42
+        RESPOND_STATE   = -42,
+        UPGRADE         = -43
     }
 }

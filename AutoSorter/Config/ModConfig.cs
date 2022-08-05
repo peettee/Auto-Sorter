@@ -5,6 +5,7 @@
     {
         public int CheckIntervalSeconds;
         public bool Debug;
+        public bool InitialHelpShown;
         public UpgradeCost[] UpgradeCosts;
         public bool AllStoragesAllowed;
         public float ReturnItemsOnDowngradeMultiplier;

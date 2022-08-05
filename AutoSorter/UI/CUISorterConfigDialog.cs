@@ -10,14 +10,15 @@ namespace pp.RaftMods.AutoSorter
     public class CUISorterConfigDialog : MonoBehaviour
     {
         private const int LOAD_ITEMS_PER_FRAME = 4;
-        private const int MAX_DISPLAY_ITEMS = 50;
+        private const int MAX_DISPLAY_ITEMS = 25;
 
+        private Transform mi_itemEntryAnchor;
         private Transform mi_itemAnchor;
-        private Transform mi_itemListAnchor;
-        private Transform mi_searchAnchor;
+        private Transform mi_content;
         private Transform mi_upgradeOverlay;
         private Transform mi_initOverlay;
-
+        private Transform mi_helpOverlay;
+          
         private Button mi_downgradeButton;
         private Button mi_upgradeButton;
 
@@ -25,11 +26,22 @@ namespace pp.RaftMods.AutoSorter
         private Button mi_priorityIncrease;
         private Button mi_priorityDecrease;
         private TextMeshProUGUI mi_statusText;
+        private TextMeshProUGUI mi_helpText;
 
         private TMP_InputField mi_inputField;
 
         private Toggle mi_optionAutoMode;
         private TextMeshProUGUI mi_upgradeOverlayText;
+
+        private Button mi_selectAllButton;
+        private Button mi_deselectAllButton;
+        private Button mi_selectFilteredButton;
+        private Button mi_deselectFilteredButton;
+        private Button mi_closeHelpButton;
+        private Button mi_openHelpButton;
+
+        private Button mi_showButton;
+        private Button mi_hideButton;
 
         private Dictionary<int, CUISorterConfigItem> mi_itemControls = new Dictionary<int, CUISorterConfigItem>();
 
@@ -43,30 +55,48 @@ namespace pp.RaftMods.AutoSorter
 
         private string mi_searchQuery = string.Empty;
         private MenuType mi_previousMenuType;
+        private bool mi_isHidden;
 
         private void Awake()
         {
-            Transform contentRoot = transform.Find("Content");
-            mi_itemListAnchor   = contentRoot.Find("ItemList");
-            mi_itemAnchor       = mi_itemListAnchor.GetChild(0).GetChild(0); //from the scroll rect get viewport and then the content anchor to spawn item prefabs in
+            mi_content = transform.Find("Content");
+            mi_upgradeOverlay   = transform.Find("_Upgrade_Overlay");
+            mi_initOverlay      = transform.Find("_Initialize_Overlay");
+            mi_helpOverlay      = transform.Find("_Help_Overlay");
+            mi_showButton       = transform.Find("Button_Show").GetComponent<Button>();
+            mi_hideButton       = transform.Find("Button_Hide").GetComponent<Button>();
 
-            mi_optionAutoMode   = contentRoot.Find("Options/AutomMode_Toggle").GetComponent<Toggle>();
-            mi_downgradeButton  = contentRoot.Find("Options/Downgrade_Button").GetComponent<Button>();
+            mi_optionAutoMode   = mi_content.Find("Options/AutomMode_Toggle").GetComponent<Toggle>();
+            mi_downgradeButton  = mi_content.Find("Options/Downgrade_Button").GetComponent<Button>();
+            mi_openHelpButton   = mi_content.Find("Options/Help_Button").GetComponent<Button>();
 
-            mi_sorterPriority   = contentRoot.Find("Priority/Text_Priority").GetComponent<TextMeshProUGUI>();
-            mi_priorityDecrease = contentRoot.Find("Priority/Button_Decrease").GetComponent<Button>();
-            mi_priorityIncrease = contentRoot.Find("Priority/Button_Increase").GetComponent<Button>();
+            mi_sorterPriority   = mi_content.Find("Priority/Text_Priority").GetComponent<TextMeshProUGUI>();
+            mi_priorityDecrease = mi_content.Find("Priority/Button_Decrease").GetComponent<Button>();
+            mi_priorityIncrease = mi_content.Find("Priority/Button_Increase").GetComponent<Button>();
 
-            mi_searchAnchor     = contentRoot.Find("ItemSearch");
-            mi_inputField       = mi_searchAnchor.Find("Input").GetComponent<TMP_InputField>();
+            mi_itemAnchor       = mi_content.Find("Items");
 
-            mi_upgradeOverlay   = contentRoot.Find("_Upgrade_Overlay");
-            mi_initOverlay      = contentRoot.Find("_Initialize_Overlay");
+            var itemList = mi_itemAnchor.Find("ItemList");
+            mi_itemEntryAnchor = itemList.GetChild(0).GetChild(0); //from the scroll rect get viewport and then the content anchor to spawn item prefabs in
 
-            mi_statusText       = contentRoot.Find("Text_Status").GetComponent<TextMeshProUGUI>();
+            var selectionAnchor         = mi_itemAnchor.Find("Selection");
+            mi_selectAllButton          = selectionAnchor.Find("Button_Select_All").GetComponent<Button>();
+            mi_deselectAllButton        = selectionAnchor.Find("Button_Deselect_All").GetComponent<Button>();
+            mi_selectFilteredButton     = selectionAnchor.Find("Button_Select").GetComponent<Button>();
+            mi_deselectFilteredButton   = selectionAnchor.Find("Button_Deselect").GetComponent<Button>();
 
-            mi_upgradeOverlayText = mi_upgradeOverlay.Find("Text_UpgradeMessage").GetComponent<TextMeshProUGUI>();
-            mi_upgradeButton = mi_upgradeOverlay.Find("Button_Upgrade").GetComponent<Button>();
+            var searchAnchor        = mi_itemAnchor.Find("ItemSearch");
+            mi_inputField           = searchAnchor.Find("Input").GetComponent<TMP_InputField>();
+
+            mi_statusText           = mi_itemAnchor.Find("Text_Status").GetComponent<TextMeshProUGUI>();
+
+            mi_upgradeOverlayText   = mi_upgradeOverlay.Find("Text_UpgradeMessage").GetComponent<TextMeshProUGUI>();
+            mi_upgradeButton        = mi_upgradeOverlay.Find("Button_Upgrade").GetComponent<Button>();
+
+            mi_helpText             = mi_helpOverlay
+                                        .GetComponentInChildren<ScrollRect>()
+                                        .GetComponentInChildren<TextMeshProUGUI>();
+            mi_closeHelpButton      = mi_helpOverlay.GetComponentInChildren<Button>();
 
             mi_optionAutoMode.onValueChanged.AddListener(new UnityEngine.Events.UnityAction<bool>(OnAutoModeToggled));
             mi_downgradeButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnDowngradeButtonClicked));
@@ -79,14 +109,30 @@ namespace pp.RaftMods.AutoSorter
             mi_inputField.onSelect.AddListener(new UnityEngine.Events.UnityAction<string>(OnInputSelected));
             mi_inputField.onDeselect.AddListener(new UnityEngine.Events.UnityAction<string>(OnInputDeselected));
 
+            mi_selectAllButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnSelectAllClicked));
+            mi_deselectAllButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnDeselectAllClicked));
+            mi_selectFilteredButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnSelectFilteredClicked));
+            mi_deselectFilteredButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnDeselectFilteredClicked));
+
+            mi_closeHelpButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnCloseHelpButtonClicked));
+            mi_openHelpButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnOpenHelpButtonClicked));
+
+            mi_showButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnShowButtonClicked));
+            mi_hideButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnHideButtonClicked));
+
             mi_upgradeOverlayText.text = "Upgrading the storage to an autosorter will require:\n" + string.Join("\n", CAutoSorter.Config.UpgradeCosts.Select(_o => _o.Name + ": " + _o.Amount));
         }
 
         private void Start()
         {
+            mi_helpOverlay.gameObject.SetActive(false);
             mi_initOverlay.gameObject.SetActive(true);
+            mi_showButton.gameObject.SetActive(false);
+            mi_hideButton.gameObject.SetActive(true);
             mi_upgradeOverlay.gameObject.SetActive(false);
+
             gameObject.SetActive(false);
+            mi_helpText.text = CAutoSorter.HelpText;
         }
 
         public void Load(GameObject _itemPrefab)
@@ -101,21 +147,19 @@ namespace pp.RaftMods.AutoSorter
 
             mi_currentStorage   = _storage;
 
-            mi_searchQuery = "";
-            mi_inputField.text = "";
+            mi_searchQuery      = "";
+            mi_inputField.text  = "";
 
-            mi_searchAnchor.gameObject.SetActive(!(_storage.Data?.AutoMode ?? true));
-            mi_itemListAnchor.gameObject.SetActive(!(_storage.Data?.AutoMode ?? true));
-            mi_statusText.gameObject.SetActive(!(_storage.Data?.AutoMode ?? true));
+            mi_itemAnchor.gameObject.SetActive(!(_storage.Data?.AutoMode ?? true) && _storage.IsUpgraded);
 
-            //if (!mi_loaded)
-            //{
-            //    if (mi_itemCreateRoutine != null)
-            //    {
-            //        StopCoroutine(mi_itemCreateRoutine);
-            //    }
-            //    mi_itemCreateRoutine = StartCoroutine(LoadItems());
-            //} else 
+            if (!CAutoSorter.Config.InitialHelpShown)
+            {
+                mi_hideButton.gameObject.SetActive(false);
+                mi_helpOverlay.gameObject.SetActive(true);
+                CAutoSorter.Config.InitialHelpShown = true;
+                CAutoSorter.Get.SaveConfig();
+            }
+
             if (mi_loaded)
             {
                 Reload();
@@ -123,10 +167,12 @@ namespace pp.RaftMods.AutoSorter
 
             if (!_storage.IsUpgraded)
             {
-                mi_upgradeOverlay.gameObject.SetActive(true);
+                if (!mi_isHidden)
+                {
+                    mi_upgradeOverlay.gameObject.SetActive(true);
+                }
                 return;
             }
-
 
             LoadWorkingData();
 
@@ -145,8 +191,8 @@ namespace pp.RaftMods.AutoSorter
 
         private void LoadWorkingData()
         {
-            mi_optionAutoMode.SetIsOnWithoutNotify(mi_currentStorage.Data.AutoMode);
-         
+            mi_optionAutoMode.isOn = mi_currentStorage.Data.AutoMode; //trigger notify on purpose
+            
             UpdatePriorityLabel();
         }
 
@@ -168,7 +214,7 @@ namespace pp.RaftMods.AutoSorter
                 if (item.settings_Inventory == null) continue;
                 if (mi_itemControls.ContainsKey(item.UniqueIndex)) continue;
 
-                go = GameObject.Instantiate(mi_itemAsset, mi_itemAnchor, false);
+                go = GameObject.Instantiate(mi_itemAsset, mi_itemEntryAnchor, false);
                 var cfgItem = go.AddComponent<CUISorterConfigItem>();
                 if (!cfgItem)
                 {
@@ -207,7 +253,7 @@ namespace pp.RaftMods.AutoSorter
             bool pre;
             foreach (var item in mi_itemControls)
             {
-                vis = item.Value.Item.name.ToLower().Contains(mi_searchQuery);
+                vis = item.Value.Item.name.ToLower().Contains(mi_searchQuery) || string.IsNullOrEmpty(mi_searchQuery);
                 pre = item.Value.gameObject.activeSelf;
                 item.Value.gameObject.SetActive(vis && visible < MAX_DISPLAY_ITEMS);
                 item.Value.LoadStorage(mi_currentStorage);
@@ -236,19 +282,34 @@ namespace pp.RaftMods.AutoSorter
             {
                 mi_statusText.text = string.Empty;
             }
-        }
+        }  
 
         private void UpdatePriorityLabel()
         {
             mi_sorterPriority.text = "Priority: " + mi_currentStorage.Data.Priority;
         }
+        
+        private void Reload()
+        {
+            if (mi_itemCreateRoutine != null)
+            {
+                StopCoroutine(mi_itemCreateRoutine);
+            }
+            mi_itemCreateRoutine = StartCoroutine(WaitAndReload());
+        }
 
+        #region UI_CALLBACKS
         private void OnUpgradeButtonClicked()
         {
             if (mi_currentStorage.AutoSorter.Upgrade())
             {
+                CAutoSorter.Get.Sounds?.PlayUI_Click();
                 mi_upgradeOverlay.gameObject.SetActive(false);
                 LoadWorkingData();
+            }
+            else
+            {
+                CAutoSorter.Get.Sounds?.PlayUI_Click_Fail();
             }
         }
 
@@ -263,6 +324,7 @@ namespace pp.RaftMods.AutoSorter
                     if (_result)
                     {
                         mi_upgradeOverlay.gameObject.SetActive(true);
+                        mi_itemAnchor.gameObject.SetActive(false);
                         mi_currentStorage.AutoSorter.Downgrade();
                     }
                 });
@@ -270,13 +332,11 @@ namespace pp.RaftMods.AutoSorter
 
         private void OnAutoModeToggled(bool _isOn)
         {
-            mi_currentStorage.Data.AutoMode = _isOn;
-
             CAutoSorter.Get.Sounds?.PlayUI_Click();
 
-            mi_searchAnchor.gameObject.SetActive(!_isOn);
-            mi_itemListAnchor.gameObject.SetActive(!_isOn);
-            mi_statusText.gameObject.SetActive(!_isOn);
+            mi_currentStorage.Data.AutoMode = _isOn;
+
+            mi_itemAnchor.gameObject.SetActive(!_isOn);
         }
 
         private void OnPriorityIncreaseButtonClick()
@@ -317,19 +377,126 @@ namespace pp.RaftMods.AutoSorter
             CanvasHelper.ActiveMenu = MenuType.PauseMenu; //locks all input while the input field is focused
         }
 
-        private void Reload()
+        private void OnSelectAllClicked()
         {
-            if (mi_itemCreateRoutine != null)
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            CAutoSorter.Get.Dialog.ShowPrompt("This will wipe your current selection.\nContinue?", 
+            _result =>
             {
-                StopCoroutine(mi_itemCreateRoutine);
-            }
-            mi_itemCreateRoutine = StartCoroutine(WaitAndReload());
+                if (!_result) return;
+                foreach (var toggle in mi_itemControls)
+                {
+                    toggle.Value.ItemToggle.isOn = true;
+                }
+            });
         }
+
+        private void OnDeselectAllClicked()
+        {
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            CAutoSorter.Get.Dialog.ShowPrompt("This will wipe your current selection.\nContinue?",
+            _result =>
+            {
+                if (!_result) return;
+                foreach (var toggle in mi_itemControls)
+                {
+                    toggle.Value.ItemToggle.isOn = false;
+                }
+            });
+        }
+
+        private void OnSelectFilteredClicked()
+        {
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            foreach (var toggle in mi_itemControls)
+            {
+                if (!toggle.Value.gameObject.activeSelf) continue;
+                toggle.Value.ItemToggle.isOn = true;
+            }
+        }
+
+        private void OnDeselectFilteredClicked()
+        {
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            foreach (var toggle in mi_itemControls)
+            {
+                if (!toggle.Value.gameObject.activeSelf) continue;
+                toggle.Value.ItemToggle.isOn = false;
+            }
+        }
+        
+        private void OnCloseHelpButtonClicked()
+        {
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            mi_hideButton.gameObject.SetActive(true);
+            mi_helpOverlay.gameObject.SetActive(false);
+        }
+
+        private void OnOpenHelpButtonClicked()
+        {
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            mi_hideButton.gameObject.SetActive(false);
+            mi_helpOverlay.gameObject.SetActive(true);
+        }
+
+        private void OnHideButtonClicked()
+        {
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            mi_hideButton.gameObject.SetActive(false);
+            mi_showButton.gameObject.SetActive(true);
+
+            mi_helpOverlay.gameObject.SetActive(false);
+            mi_initOverlay.gameObject.SetActive(false);
+            mi_upgradeOverlay.gameObject.SetActive(false);
+
+            mi_content.gameObject.SetActive(false);
+
+            mi_isHidden = true;
+        }
+
+        private void OnShowButtonClicked()
+        {
+            CAutoSorter.Get.Sounds?.PlayUI_Click();
+
+            mi_hideButton.gameObject.SetActive(true);
+            mi_showButton.gameObject.SetActive(false);
+
+            if (!mi_loaded)
+            {
+                mi_initOverlay.gameObject.SetActive(true);
+            }
+            else if (!mi_currentStorage.IsUpgraded)
+            {
+                mi_upgradeOverlay.gameObject.SetActive(true);
+            }
+
+            mi_content.gameObject.SetActive(true);
+            
+            mi_isHidden = false;
+
+        }
+        #endregion
 
         private IEnumerator WaitAndReload()
         {
             yield return new WaitForSeconds(1f);
             yield return ReloadItems();
+        }
+    
+        [System.Flags]
+        private enum EAdditionalItemFilterType
+        {
+            NONE            = 0,
+            ACTIVE          = 1,
+            INACTIVE        = 1 << 1,
+            AMOUNT_CONTROL  = 1 << 2
         }
     }
 }

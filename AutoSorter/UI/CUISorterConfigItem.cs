@@ -22,11 +22,11 @@ namespace pp.RaftMods.AutoSorter
 
         public void Load(Item_Base _item)
         {   
-            ItemImage           = transform.Find("Item_Image").GetChild(0).GetComponent<Image>();
-            ItemText            = transform.Find("Item_Name").GetComponent<TextMeshProUGUI>();
-            ItemToggle          = transform.Find("Item_Toggle").GetComponent<Toggle>();
-            NoAmountControlToggle = transform.Find("Toggle_Amount").GetComponent<Toggle>();
-            MaxAmountInput      = transform.Find("Input_Amount").GetComponent<TMP_InputField>();
+            ItemImage               = transform.Find("Item_Image").GetChild(0).GetComponent<Image>();
+            ItemText                = transform.Find("Item_Name").GetComponent<TextMeshProUGUI>();
+            ItemToggle              = transform.Find("Item_Toggle").GetComponent<Toggle>();
+            NoAmountControlToggle   = transform.Find("Toggle_Amount").GetComponent<Toggle>();
+            MaxAmountInput          = transform.Find("Input_Amount").GetComponent<TMP_InputField>();
 
             mi_representsItem   = _item;
             ItemImage.sprite    = _item.settings_Inventory.Sprite;
@@ -66,7 +66,7 @@ namespace pp.RaftMods.AutoSorter
             }
             else if (!mi_storage.Data.Filters.ContainsKey(mi_representsItem.UniqueIndex))
             {
-                mi_storage.Data.Filters.Add(mi_representsItem.UniqueIndex, new CItemFilter(mi_representsItem.UniqueIndex));
+                mi_storage.Data.Filters.Add(mi_representsItem.UniqueIndex, new CItemFilter(mi_representsItem.UniqueIndex, mi_representsItem.UniqueName));
             }
 
             UpdateLayout();
@@ -87,6 +87,13 @@ namespace pp.RaftMods.AutoSorter
         {
             if (!int.TryParse(_value, 
                 out int result)) return;
+
+            if(result < 0)
+            {
+                MaxAmountInput.SetTextWithoutNotify("0");
+                return;
+            }
+
             if (!mi_storage.Data.Filters.ContainsKey(mi_representsItem.UniqueIndex)) return;
             mi_storage.Data.Filters[mi_representsItem.UniqueIndex].MaxAmount = result;
         }
@@ -103,7 +110,7 @@ namespace pp.RaftMods.AutoSorter
             CanvasHelper.ActiveMenu = MenuType.PauseMenu; //locks all input while the input field is focused
         }
 
-        private void UpdateLayout()
+        public void UpdateLayout()
         {
             if (ItemToggle.isOn)
             {

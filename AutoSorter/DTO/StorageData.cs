@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 
 namespace pp.RaftMods.AutoSorter
@@ -9,12 +11,13 @@ namespace pp.RaftMods.AutoSorter
         public string SaveName;
         public ulong ObjectID;
         public int Priority;
+        [DefaultValue(true)]
         public bool AutoMode = true;
-        //public int[] ItemStates = new int[0];
 
-        [System.NonSerialized]
-        public readonly Dictionary<int, CItemFilter> Filters = new Dictionary<int, CItemFilter>();
+        [JsonIgnore]
+        public Dictionary<int, CItemFilter> Filters = new Dictionary<int, CItemFilter>();
 
+        [JsonProperty(PropertyName = "Filters")]
         private CItemFilter[] mi_filters = new CItemFilter[0];
 
         public CStorageData() { }
@@ -27,7 +30,6 @@ namespace pp.RaftMods.AutoSorter
             Priority        = _priority;
             AutoMode        = _autoMode;
             mi_filters      = _itemStates;
-            Filters         = mi_filters.ToDictionary(_o => _o.Index, _o => _o);
         }
 
         public CStorageData Copy()
@@ -37,7 +39,18 @@ namespace pp.RaftMods.AutoSorter
 
         public void OnBeforeSerialize()
         {
+            CUtil.LogD("Saving " + Filters.Count + " filters.");
+            CUtil.LogD("A " + AutoMode);
+
             mi_filters = Filters.Select(_o => _o.Value).ToArray();
+        }
+
+        public void OnAfterDeserialize()
+        {
+            if (mi_filters != null)
+            {
+                Filters = mi_filters.ToDictionary(_o => _o.Index, _o => _o);
+            }
         }
     }
 
@@ -45,12 +58,15 @@ namespace pp.RaftMods.AutoSorter
     public class CItemFilter
     {
         public int Index;
+        public string UniqueName;
+        [DefaultValue(true)]
         public bool NoAmountControl = true;
         public int MaxAmount;
 
-        public CItemFilter(int _index)
+        public CItemFilter(int _index, string _name)
         {
-            Index = _index;
+            Index       = _index;
+            UniqueName  = _name;
         }
     }
 }
