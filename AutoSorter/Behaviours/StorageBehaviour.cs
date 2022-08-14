@@ -81,7 +81,7 @@ namespace pp.RaftMods.AutoSorter
                 List<int> alreadyChecked;
                 foreach (var storage in mi_mod.SceneStorages)
                 {
-                    if (storage.IsUpgraded) continue;
+                    if (storage.IsUpgraded && (!CAutoSorter.Config.TransferFromAutosorters || storage == mi_sceneStorage)) continue;
 
                     alreadyChecked = new List<int>();
                     targetInventory = storage.StorageComponent.GetInventoryReference();
@@ -146,7 +146,7 @@ namespace pp.RaftMods.AutoSorter
         {
             if (!mi_loaded)
             {
-                CUtil.Log("Not loaded");
+                CUtil.LogD("Received network message but storage is not fully loaded. Dropping message...");
                 return;
             }
 
@@ -196,7 +196,11 @@ namespace pp.RaftMods.AutoSorter
             mi_sceneStorage.Data = new CStorageData(ObjectIndex);
             UpdateStorageMaterials();
             SendUpgradeState(true);
-            RuntimeManager.PlayOneShot(Traverse.Create(mi_sceneStorage.StorageComponent).Field("eventRef_open").GetValue<string>(), transform.position);
+            var soundRef = Traverse.Create(mi_sceneStorage.StorageComponent).Field("eventRef_open").GetValue<string>();
+            if (!string.IsNullOrEmpty(soundRef))
+            {
+                RuntimeManager.PlayOneShot(soundRef, transform.position);
+            }
             return true;
         }
 
@@ -214,7 +218,12 @@ namespace pp.RaftMods.AutoSorter
             mi_sceneStorage.Data = null;
             UpdateStorageMaterials();
             SendUpgradeState(false);
-            RuntimeManager.PlayOneShot(Traverse.Create(mi_sceneStorage.StorageComponent).Field("eventRef_close").GetValue<string>(), transform.position);
+
+            var soundRef = Traverse.Create(mi_sceneStorage.StorageComponent).Field("eventRef_close").GetValue<string>();
+            if (!string.IsNullOrEmpty(soundRef))
+            {
+                RuntimeManager.PlayOneShot(soundRef, transform.position);
+            }
         } 
 
         protected override void OnDestroy()
@@ -247,7 +256,7 @@ namespace pp.RaftMods.AutoSorter
                 {
                     if (mat.HasProperty("_Diffuse"))
                     {
-                        if (mi_sceneStorage.IsUpgraded)
+                        if (mi_sceneStorage.IsUpgraded && CAutoSorter.Config.ChangeStorageColorOnUpgrade)
                         {
                             if (mi_customTexture == null) //pretty heavy operation to make chests red that use the Vegetation shader. There is no way (afaik) to change the main color.
                             {
@@ -266,7 +275,7 @@ namespace pp.RaftMods.AutoSorter
                     }
                     else if(mat.HasProperty("_MainTex")) //probably std mat
                     {
-                        mat.color = mi_sceneStorage.IsUpgraded ? Color.red : Color.white;
+                        mat.color = mi_sceneStorage.IsUpgraded && CAutoSorter.Config.ChangeStorageColorOnUpgrade ? Color.red : Color.white;
                     }
                 }
                 rend.materials = materials;

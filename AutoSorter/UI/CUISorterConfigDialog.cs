@@ -10,7 +10,6 @@ namespace pp.RaftMods.AutoSorter
     public class CUISorterConfigDialog : MonoBehaviour
     {
         private const int LOAD_ITEMS_PER_FRAME = 4;
-        private const int MAX_DISPLAY_ITEMS = 25;
 
         private Transform mi_itemEntryAnchor;
         private Transform mi_itemAnchor;
@@ -203,17 +202,18 @@ namespace pp.RaftMods.AutoSorter
 
         public IEnumerator LoadItems()
         {
-            CUtil.LogW("Loading items...");
             mi_initOverlay.gameObject.SetActive(true);
+            CUtil.ClearChildren(mi_itemEntryAnchor);
 
             int current = 0;
             var items = ItemManager.GetAllItems().ToArray();
+            CUtil.LogD($"Loading {items.Length} items...");
             GameObject go;
             foreach (var item in items)
             {
-                if (item.settings_Inventory == null) continue;
+                if (item.settings_Inventory == null || 
+                    item.settings_Inventory.DisplayName == "An item") continue; //ignore "An item" undefined items
                 if (mi_itemControls.ContainsKey(item.UniqueIndex)) continue;
-
                 go = GameObject.Instantiate(mi_itemAsset, mi_itemEntryAnchor, false);
                 var cfgItem = go.AddComponent<CUISorterConfigItem>();
                 if (!cfgItem)
@@ -240,7 +240,7 @@ namespace pp.RaftMods.AutoSorter
 
             mi_loaded = true;
             mi_initOverlay.gameObject.SetActive(false);
-            CUtil.LogW("Done Loading items");
+            CUtil.LogD("Done Loading items");
         }
 
         private IEnumerator ReloadItems()
@@ -255,7 +255,7 @@ namespace pp.RaftMods.AutoSorter
             {
                 vis = item.Value.Item.name.ToLower().Contains(mi_searchQuery) || string.IsNullOrEmpty(mi_searchQuery);
                 pre = item.Value.gameObject.activeSelf;
-                item.Value.gameObject.SetActive(vis && visible < MAX_DISPLAY_ITEMS);
+                item.Value.gameObject.SetActive(vis && visible < CAutoSorter.Config.MaxSearchResultItems);
                 item.Value.LoadStorage(mi_currentStorage);
                 visible += vis ? 1 : 0;
                 ++current;
@@ -270,9 +270,9 @@ namespace pp.RaftMods.AutoSorter
             {
                 mi_statusText.text = "No items match your current search query.";
             }
-            else if(visible > MAX_DISPLAY_ITEMS)
+            else if(visible > CAutoSorter.Config.MaxSearchResultItems)
             {
-                mi_statusText.text = (visible - MAX_DISPLAY_ITEMS) + " match your query but are not displayed.\nNarrow down your search to display them.";
+                mi_statusText.text = (visible - CAutoSorter.Config.MaxSearchResultItems) + " match your query but are not displayed.\nNarrow down your search to display them.";
             }
             else if(mi_itemControls.Count > visible)
             {

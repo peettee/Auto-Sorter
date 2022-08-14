@@ -1,12 +1,12 @@
 ManifestFileVersion: 0
-CRC: 2961821028
+CRC: 2356528021
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 81173bddfe65ad643df425f63bcf909a
+    Hash: eb8004107b70211450f716f576f197b6
   TypeTreeHash:
     serializedVersion: 2
-    Hash: e1a7cef1c75b6f24d338f9f79459d0d1
+    Hash: 6275a3334bba6a37536e127afbc29b7f
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -16,6 +16,8 @@ ClassTypes:
 - Class: 28
   Script: {instanceID: 0}
 - Class: 48
+  Script: {instanceID: 0}
+- Class: 49
   Script: {instanceID: 0}
 - Class: 114
   Script: {fileID: 11500000, guid: 2a4db7a114972834c8e4117be1d82ba3, type: 3}
@@ -56,6 +58,7 @@ ClassTypes:
 - Class: 224
   Script: {instanceID: 0}
 Assets:
+- Assets/Config/help.txt
 - Assets/Prefabs/UI/Generic/Button.prefab
 - Assets/Prefabs/UI/Windows/Interaction/InteractWindow.prefab
 - Assets/Prefabs/UI/Generic/Button_Positive.prefab
@@ -63,10 +66,11 @@ Assets:
 - Assets/Prefabs/UI/Windows/Config/Item_Entry.prefab
 - Assets/Prefabs/UI/Generic/Input.prefab
 - Assets/Prefabs/UI/Generic/Text_Paragraph.prefab
+- Assets/Prefabs/UI/Generic/ScrollView.prefab
 - Assets/Prefabs/UI/Generic/Flexible_Hor_Spacer.prefab
 - Assets/Prefabs/UI/Generic/Toggle.prefab
 - Assets/Prefabs/UI/AutoSorter_UIRoot.prefab
 - Assets/Prefabs/UI/Generic/Button_Negative.prefab
-- Assets/Prefabs/UI/Windows/Config/ConfigDialog.prefab
+- Assets/Prefabs/UI/Windows/Dialog/ConfigDialog.prefab
 - Assets/Prefabs/UI/Windows/Dialog/Dialog.prefab
 Dependencies: []

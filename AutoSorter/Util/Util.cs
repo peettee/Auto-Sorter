@@ -59,5 +59,13 @@ namespace pp.RaftMods.AutoSorter
             r.Release();
             return tex;
         }
+
+        public static void ClearChildren(Transform _transform)
+        {
+            for (int i = 0; i < _transform.childCount; ++i)
+            {
+                GameObject.Destroy(_transform.GetChild(i).gameObject);
+            }
+        }
     }
 }

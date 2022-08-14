@@ -34,10 +34,12 @@ namespace pp.RaftMods.AutoSorter
         private string ModConfigFilePath    => Path.Combine(ModDataDirectory, "config.json");
         private string ModDataFilePath      => Path.Combine(ModDataDirectory, "storagedata.json");
 
-        public static CModConfig Config             { get; private set; }
+        private static CModConfig ExtraSettingsAPI_Settings = new CModConfig();
+
+        public static CModConfig Config { get => ExtraSettingsAPI_Settings; private set { ExtraSettingsAPI_Settings = value; } }
         public static string HelpText               { get; private set; }
         public List<CSceneStorage> SceneStorages    { get; private set; }
-        public double LastCheckDurationMillis       { get; private set; }
+        public double LastCheckDurationSeconds      { get; private set; }
         public CUIDialog Dialog                     { get; private set; }
         public SoundManager Sounds                  { get; private set; }
         
@@ -68,6 +70,7 @@ namespace pp.RaftMods.AutoSorter
             Get = this;
 
             mi_defaultMessagesOffset = (short)System.Enum.GetNames(typeof(Messages)).Length;
+            LoadConfig();
 
             mi_harmony = new Harmony(MOD_NAMESPACE);
             mi_harmony.PatchAll(Assembly.GetExecutingAssembly());
@@ -102,7 +105,6 @@ namespace pp.RaftMods.AutoSorter
                 CUtil.LogW("Failed to get sound manager on mod load.");
             }
 
-            LoadConfig();
             LoadStorageData();
 
             //if (RAPI.IsCurrentSceneGame())
@@ -170,7 +172,7 @@ namespace pp.RaftMods.AutoSorter
                 if (!RAPI.IsCurrentSceneGame())
                 {
                     mi_checkChests = false;
-                    continue;
+                    break;
                 }
 
                 if (SceneStorages != null)
@@ -181,9 +183,9 @@ namespace pp.RaftMods.AutoSorter
                     {
                         yield return storage.AutoSorter.CheckItems();
                     }
-                    LastCheckDurationMillis = (System.DateTime.UtcNow - now).TotalSeconds;
+                    LastCheckDurationSeconds = (System.DateTime.UtcNow - now).TotalSeconds;
                 }
-                if (LastCheckDurationMillis < Config.CheckIntervalSeconds)
+                if (LastCheckDurationSeconds < Config.CheckIntervalSeconds)
                 {
                     yield return new WaitForSeconds(Config.CheckIntervalSeconds);
                 }
@@ -193,7 +195,10 @@ namespace pp.RaftMods.AutoSorter
         public override void WorldEvent_WorldLoaded()
         {
             base.WorldEvent_WorldLoaded();
-            //LoadStorages();
+            if (mi_uiRoot == null)
+            {
+                LoadUI();
+            }
             StartCoroutine(mi_configDialog.LoadItems());
             mi_checkChests = true;
             mi_chestRoutineHandle = StartCoroutine(CheckStorages());
@@ -262,8 +267,8 @@ namespace pp.RaftMods.AutoSorter
                     SaveConfig();
                     return;
                 }
-
-                Config = JsonConvert.DeserializeObject<CModConfig>(File.ReadAllText(ModConfigFilePath)) ?? throw new System.Exception("Deserialisation failed.");
+                CUtil.Log("Load configuration.");
+                Config = JsonConvert.DeserializeObject<CModConfig>(File.ReadAllText(ModConfigFilePath)) ?? throw new System.Exception("De-serialisation failed.");
             }
             catch (System.Exception _e)
             {
@@ -319,7 +324,7 @@ namespace pp.RaftMods.AutoSorter
             {
                 if (!File.Exists(ModDataFilePath)) return;
 
-                CStorageData[] data = JsonConvert.DeserializeObject<CStorageData[]>(File.ReadAllText(ModDataFilePath)) ?? throw new System.Exception("Deserialisation failed.");
+                CStorageData[] data = JsonConvert.DeserializeObject<CStorageData[]>(File.ReadAllText(ModDataFilePath)) ?? throw new System.Exception("De-serialisation failed.");
                 SavedStorageData = data
                     .GroupBy(_o => _o.SaveName)
                     .Select(_o => new KeyValuePair<string, CStorageData[]>(_o.Key, _o.ToArray()))
@@ -354,17 +359,20 @@ namespace pp.RaftMods.AutoSorter
                     SavedStorageData.Remove(SaveAndLoad.CurrentGameFileName);
                 }
 
-                foreach(var storage in SceneStorages)
+                if (SceneStorages != null)
                 {
-                    storage.Data?.OnBeforeSerialize();
-                }
+                    foreach (var storage in SceneStorages)
+                    {
+                        storage.Data?.OnBeforeSerialize();
+                    }
 
-                SavedStorageData.Add(
-                    SaveAndLoad.CurrentGameFileName,
-                    SceneStorages
-                        .Where(_o => _o.AutoSorter && _o.IsUpgraded)
-                        .Select(_o => _o.Data)
-                        .ToArray());
+                    SavedStorageData.Add(
+                        SaveAndLoad.CurrentGameFileName,
+                        SceneStorages
+                            .Where(_o => _o.AutoSorter && _o.IsUpgraded)
+                            .Select(_o => _o.Data)
+                            .ToArray());
+                }
 
                 File.WriteAllText(
                     ModDataFilePath,
@@ -391,14 +399,9 @@ namespace pp.RaftMods.AutoSorter
                 SceneStorages = new List<CSceneStorage>();
             }
 
-            if(mi_uiRoot == null)
-            {
-                LoadUI();
-            }
-
             if (SceneStorages.Any(_o => _o.StorageComponent == _storage)) return;
 
-            CUtil.LogW("Adding storage " + _storage.gameObject);
+            CUtil.LogD("Registering storage " + _storage.gameObject);
 
             var sceneStorage = new CSceneStorage();
             sceneStorage.StorageComponent   = _storage;
@@ -446,13 +449,13 @@ namespace pp.RaftMods.AutoSorter
 
         public void SendTo(CDTO _object, CSteamID _id)
         {
-            CUtil.Log("Sending " + _object.Type + " to " + _id.m_SteamID);
+            CUtil.LogD("Sending " + _object.Type + " to " + _id.m_SteamID);
             mi_network.SendP2P(_id, CreateCarrierDTO(_object), EP2PSend.k_EP2PSendReliable, NetworkChannel.Channel_Game);
         }
 
         public void Broadcast(CDTO _object)
         {
-            CUtil.Log("Broadcasting " + _object.Type + " to others");
+            CUtil.LogD("Broadcasting " + _object.Type + " to others");
             // if (!Semih_Network.IsHost) throw new System.InvalidOperationException("should only broadcast as host");
             mi_network.RPC(CreateCarrierDTO(_object), Target.Other, EP2PSend.k_EP2PSendReliable, NetworkChannel.Channel_Game);
         }
@@ -475,7 +478,6 @@ namespace pp.RaftMods.AutoSorter
             {
                 List<Message> resultMessages    = packet.messages.ToList();
                 List<Message> messages          = packet.messages.ToList();
-                CUtil.LogW("package received.");
 
                 foreach (Message package in messages)
                 {
@@ -483,8 +485,6 @@ namespace pp.RaftMods.AutoSorter
                     {
                         continue; //this is a raft message, ignore this package
                     }
-
-                    CUtil.LogW("custom message received " + package.t);
 
                     var msg = package as Message_InitiateConnection;
                     if (msg == null)

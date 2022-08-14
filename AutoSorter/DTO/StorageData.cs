@@ -39,9 +39,6 @@ namespace pp.RaftMods.AutoSorter
 
         public void OnBeforeSerialize()
         {
-            CUtil.LogD("Saving " + Filters.Count + " filters.");
-            CUtil.LogD("A " + AutoMode);
-
             mi_filters = Filters.Select(_o => _o.Value).ToArray();
         }
 
