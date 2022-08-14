@@ -5,15 +5,33 @@ using System.Linq;
 
 namespace pp.RaftMods.AutoSorter
 {
+    /// <summary>
+    /// Class used to save auto-sorter configurations to disk whenever the world is saved.
+    /// This data is loaded again whenever the player loads into the world and applied to storages.
+    /// </summary>
     [System.Serializable]
     public class CStorageData
     {
+        /// <summary>
+        /// Name of the world this storage was saved in.
+        /// </summary>
         public string SaveName;
+        /// <summary>
+        /// The object ID of the storage used to reapply settings on load.
+        /// </summary>
         public ulong ObjectID;
+        /// <summary>
+        /// Priority of the auto sorter as set by the player in the auto-sorter UI.
+        /// </summary>
         public int Priority;
+        /// <summary>
+        /// Auto mode enabled state as set by the player in the auto-sorter UI.
+        /// </summary>
         [DefaultValue(true)]
         public bool AutoMode = true;
-
+        /// <summary>
+        /// Filters applied to the auto-sorter during runtime. Is not saved to the json data but loaded from the json data and used to easily and quickly access storage data during runtime.
+        /// </summary>
         [JsonIgnore]
         public Dictionary<int, CItemFilter> Filters = new Dictionary<int, CItemFilter>();
 
@@ -51,13 +69,28 @@ namespace pp.RaftMods.AutoSorter
         }
     }
 
+    /// <summary>
+    /// Item filter class representing the filter settings for an item set by the player in the auto-sorter UI.
+    /// </summary>
     [System.Serializable]
     public class CItemFilter
     {
+        /// <summary>
+        /// Index of the item this filter is for.
+        /// </summary>
         public int Index;
+        /// <summary>
+        /// Name of the item a filter has been set for in the auto-sorter UI.
+        /// </summary>
         public string UniqueName;
+        /// <summary>
+        /// Determines whether specific amount control is enabled for the item.
+        /// </summary>
         [DefaultValue(true)]
         public bool NoAmountControl = true;
+        /// <summary>
+        /// If specific amount control is enabled, specifies the maximum amount of items transferred by the auto-sorter.
+        /// </summary>
         public int MaxAmount;
 
         public CItemFilter(int _index, string _name)

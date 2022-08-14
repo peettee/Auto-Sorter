@@ -4,6 +4,9 @@ using UnityEngine.UI;
 
 namespace pp.RaftMods.AutoSorter
 {
+    /// <summary>
+    /// Class representing a prompt for a player which is shown before performing certain actions.
+    /// </summary>
     public class CUIDialog : MonoBehaviour
     {
         private TextMeshProUGUI mi_dialogText;
@@ -25,17 +28,27 @@ namespace pp.RaftMods.AutoSorter
             mi_cancelButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnCancelButtonClicked));
         }
 
+        #region ENGINE_CALLBACKS
         private void Start()
         {
             gameObject.SetActive(false);
         }
+        #endregion
 
+        /// <summary>
+        /// Hide the user dialog.
+        /// </summary>
         public void Hide()
         {
             mi_dialogVisible = false;
             gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// Shows a dialog the user displaying the given message with an OK button only.
+        /// </summary>
+        /// <param name="_message">The message shown to the user.</param>
+        /// <param name="_onConfirm">Callback which is invoked whenever the user presses the OK button.</param>
         public void ShowInfo(string _message, System.Action _onConfirm)
         {
             if (mi_dialogVisible)
@@ -50,6 +63,11 @@ namespace pp.RaftMods.AutoSorter
             mi_currentInfoCallback = _onConfirm;
         }
 
+        /// <summary>
+        /// Shows a dialog to the user requiring a Yes or No answer.
+        /// </summary>
+        /// <param name="_message">The message shown to the user.</param>
+        /// <param name="_onResult">Callback invoked when the user confirms or declines the dialog providing a boolean indicating the users decision.</param>
         public void ShowPrompt(string _message, System.Action<bool> _onResult)
         {
             if (mi_dialogVisible)

@@ -7,6 +7,9 @@ using UnityEngine.UI;
 
 namespace pp.RaftMods.AutoSorter
 {
+    /// <summary>
+    /// Class representing the auto-sorter UI which is shown to the user whenever a storage is opened.
+    /// </summary>
     public class CUISorterConfigDialog : MonoBehaviour
     {
         private const int LOAD_ITEMS_PER_FRAME = 4;
@@ -58,7 +61,7 @@ namespace pp.RaftMods.AutoSorter
 
         private void Awake()
         {
-            mi_content = transform.Find("Content");
+            mi_content          = transform.Find("Content");
             mi_upgradeOverlay   = transform.Find("_Upgrade_Overlay");
             mi_initOverlay      = transform.Find("_Initialize_Overlay");
             mi_helpOverlay      = transform.Find("_Help_Overlay");
@@ -119,7 +122,7 @@ namespace pp.RaftMods.AutoSorter
             mi_showButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnShowButtonClicked));
             mi_hideButton.onClick.AddListener(new UnityEngine.Events.UnityAction(OnHideButtonClicked));
 
-            mi_upgradeOverlayText.text = "Upgrading the storage to an autosorter will require:\n" + string.Join("\n", CAutoSorter.Config.UpgradeCosts.Select(_o => _o.Name + ": " + _o.Amount));
+            mi_upgradeOverlayText.text = "Upgrading the storage to an auto-sorter will require:\n" + string.Join("\n", CAutoSorter.Config.UpgradeCosts.Select(_o => _o.Name + ": " + _o.Amount));
         }
 
         private void Start()
@@ -134,11 +137,19 @@ namespace pp.RaftMods.AutoSorter
             mi_helpText.text = CAutoSorter.HelpText;
         }
 
+        /// <summary>
+        /// Sets the item prefab reference-
+        /// </summary>
+        /// <param name="_itemPrefab"></param>
         public void Load(GameObject _itemPrefab)
         {
             mi_itemAsset = _itemPrefab;
         }
 
+        /// <summary>
+        /// Shows the storage configuration dialog for the given storage to the user.
+        /// </summary>
+        /// <param name="_storage">The storage to display a the configuration UI for.</param>
         public void Show(CSceneStorage _storage)
         {
             gameObject.SetActive(true);
@@ -178,6 +189,9 @@ namespace pp.RaftMods.AutoSorter
             mi_upgradeOverlay.gameObject.SetActive(false);
         }
 
+        /// <summary>
+        /// Hides the storage configuration dialog.
+        /// </summary>
         public void Hide()
         {
             mi_isVisible = false;
@@ -203,7 +217,6 @@ namespace pp.RaftMods.AutoSorter
         public IEnumerator LoadItems()
         {
             mi_initOverlay.gameObject.SetActive(true);
-            CUtil.ClearChildren(mi_itemEntryAnchor);
 
             int current = 0;
             var items = ItemManager.GetAllItems().ToArray();
@@ -240,7 +253,7 @@ namespace pp.RaftMods.AutoSorter
 
             mi_loaded = true;
             mi_initOverlay.gameObject.SetActive(false);
-            CUtil.LogD("Done Loading items");
+            CUtil.LogD("Done Loading items.");
         }
 
         private IEnumerator ReloadItems()

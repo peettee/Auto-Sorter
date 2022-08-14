@@ -1,15 +1,42 @@
 ﻿namespace pp.RaftMods.AutoSorter
 {
+    /// <summary>
+    /// Mod configuration class which represents user configuration for the mod and takes care of handling Extra Settings API mod compatibility.
+    /// </summary>
     [System.Serializable]
     public class CModConfig
     {
+        /// <summary>
+        /// Interval in seconds in which storages check if items need to be transferred.
+        /// </summary>
         public int CheckIntervalSeconds;
+        /// <summary>
+        /// If set to true, will display additional information in the console.
+        /// </summary>
         public bool Debug;
+        /// <summary>
+        /// Set by the mod, whenever the initial help text on auto-sorters has been shown.
+        /// </summary>
         public bool InitialHelpShown;
+        /// <summary>
+        /// Costs to upgrade a regular storage to an auto-sorter.
+        /// </summary>
         public UpgradeCost[] UpgradeCosts;
+        /// <summary>
+        /// If true auto-sorters will also transfer items from other auto-sorters.
+        /// </summary>
         public bool TransferFromAutosorters;
+        /// <summary>
+        /// Multiplier applied when returning items to the player on downgrade.
+        /// </summary>
         public float ReturnItemsOnDowngradeMultiplier;
+        /// <summary>
+        /// Maximum number of item search results in the auto-sorter configuration UI.
+        /// </summary>
         public int MaxSearchResultItems;
+        /// <summary>
+        /// If true changes the storages color to red on upgrade. False will leave the color untouched.
+        /// </summary>
         public bool ChangeStorageColorOnUpgrade;
 
         public CModConfig()
@@ -29,6 +56,7 @@
             };
         }
 
+        #region EXTRA_SETTINGS_API_CALLBACKS
         public static bool ExtraSettingsAPI_GetCheckboxState(string _settingName) => true;
         public static float ExtraSettingsAPI_GetSliderValue(string _settingName) => 0f;
 
@@ -40,6 +68,7 @@
         }
 
         public void ExtraSettingsAPI_SettingsClose() => ReloadSettings();
+        #endregion
 
         private void ReloadSettings()
         {
@@ -65,6 +94,9 @@ ChangeColor: {ChangeStorageColorOnUpgrade}";
         }
     }
 
+    /// <summary>
+    /// Upgrade cost class, used to represent the upgrade costs for auto-sorters in the user config file.
+    /// </summary>
     [System.Serializable]
     public class UpgradeCost
     {

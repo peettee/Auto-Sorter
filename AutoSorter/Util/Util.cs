@@ -25,6 +25,12 @@ namespace pp.RaftMods.AutoSorter
             Debug.Log($"[{CAutoSorter.MOD_NAME}][DEBUG] {_message}");
         }
 
+        /// <summary>
+        /// Adds items to the specified inventory and takes care of properly creating item stacks while doing so.
+        /// </summary>
+        /// <param name="_inventory">The inventory to add items to.</param>
+        /// <param name="_itemName">The name of the item to add to the inventory.</param>
+        /// <param name="_amount">The amount of items to add.</param>
         public static void StackedAddInventory(Inventory _inventory, string _itemName, int _amount)
         {
             if (_amount <= 0) return;
@@ -47,6 +53,13 @@ namespace pp.RaftMods.AutoSorter
             }
         }
 
+        /// <summary>
+        /// Reformats the given texture, copying its context to a new texture with the provided format.
+        /// </summary>
+        /// <param name="_texture">The texture to reformat.</param>
+        /// <param name="_format">The new format of the texture.</param>
+        /// <param name="_useMipMaps">Are mip-maps enabled for the newly created texture.</param>
+        /// <returns>A new texture object reformatted with the provided settings.</returns>
         public static Texture2D MakeReadable(Texture2D _texture, TextureFormat _format = TextureFormat.RGB24, bool _useMipMaps = false)
         {
             RenderTexture r = RenderTexture.GetTemporary(_texture.width, _texture.height);
@@ -58,14 +71,6 @@ namespace pp.RaftMods.AutoSorter
             RenderTexture.active = null;
             r.Release();
             return tex;
-        }
-
-        public static void ClearChildren(Transform _transform)
-        {
-            for (int i = 0; i < _transform.childCount; ++i)
-            {
-                GameObject.Destroy(_transform.GetChild(i).gameObject);
-            }
         }
     }
 }
