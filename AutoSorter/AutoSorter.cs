@@ -22,7 +22,7 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         public static CAutoSorter Get = null;
 
-        public const string VERSION                                 = "1.0.1";
+        public const string VERSION                                 = "1.0.2";
         public const string MOD_NAME                                = "AutoSorter";
         private const string MOD_NAMESPACE                          = "pp.RaftMods." + MOD_NAME;
 
@@ -411,6 +411,7 @@ namespace pp.RaftMods.AutoSorter
         
         private void LoadUI()
         {
+            CUtil.LogD("Loading auto-sorter UI...");
             GameObject rootAsset = mi_bundle.LoadAsset<GameObject>(UI_CONFIG_DIALOG_PREFAB_PATH);
             if (!rootAsset)
             {
@@ -444,6 +445,7 @@ namespace pp.RaftMods.AutoSorter
 
             Transform dialogRoot = mi_uiRoot.transform.Find("Dialog");
             Dialog = dialogRoot.gameObject.AddComponent<CUIDialog>();
+            CUtil.LogD("Auto-sorter UI loaded!");
         }
 
         private void RegisterStorage(Storage_Small _storage)
@@ -586,6 +588,8 @@ namespace pp.RaftMods.AutoSorter
         [HarmonyPatch(typeof(Storage_Small), "Open")]
         private class CHarmonyPatch_Storage_Small_Open
         {
+            private static Coroutine mi_routine;
+
             [HarmonyPostfix]
             private static void Storage_Small_Open(Storage_Small __instance, Network_Player player)
             {
@@ -597,7 +601,25 @@ namespace pp.RaftMods.AutoSorter
                     CUtil.LogW("Failed to find matching storage on storage open. This is a bug and should be reported.");
                     return;
                 }
+
+                if(Get.mi_configDialog == null) //If the UI is not fully loaded directly after entering the scene, make sure we wait until its available before showing it to the user.
+                {
+                    if(mi_routine != null)
+                    {
+                        Get.StopCoroutine(mi_routine);
+                    }
+                    mi_routine = Get.StartCoroutine(WaitAndShowUI(storage));
+                    return;
+                }
+
                 Get.mi_configDialog.Show(storage);
+            }
+
+            private static IEnumerator WaitAndShowUI(CSceneStorage _storage)
+            {
+                while (Get.mi_configDialog == null) yield return new WaitForEndOfFrame();
+                if (!_storage.StorageComponent.IsOpen) yield break;
+                Get.mi_configDialog.Show(_storage);
             }
         }
 
@@ -609,7 +631,7 @@ namespace pp.RaftMods.AutoSorter
             {
                 if (player == null || !player.IsLocalPlayer) return;
 
-                Get.mi_configDialog.Hide();
+                Get.mi_configDialog?.Hide();
 
                 var storage = Get.SceneStorages.FirstOrDefault(_o => _o.StorageComponent.ObjectIndex == __instance.ObjectIndex);
                 if (storage == null)

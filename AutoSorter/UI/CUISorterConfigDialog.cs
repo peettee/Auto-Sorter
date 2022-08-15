@@ -155,12 +155,12 @@ namespace pp.RaftMods.AutoSorter
             gameObject.SetActive(true);
             mi_isVisible = true;
 
-            mi_currentStorage   = _storage;
+            mi_currentStorage = _storage;
 
-            mi_searchQuery      = "";
-            mi_inputField.text  = "";
+            mi_searchQuery = "";
+            mi_inputField.text = "";
 
-            mi_itemAnchor.gameObject.SetActive(!(_storage.Data?.AutoMode ?? true) && _storage.IsUpgraded);
+            mi_itemAnchor.gameObject.SetActive(!(_storage.Data?.AutoMode ?? true) && _storage.IsUpgraded && mi_loaded);
 
             if (!CAutoSorter.Config.InitialHelpShown)
             {
@@ -184,7 +184,10 @@ namespace pp.RaftMods.AutoSorter
                 return;
             }
 
-            LoadWorkingData();
+            if (mi_loaded)
+            {
+                LoadWorkingData();
+            } 
 
             mi_upgradeOverlay.gameObject.SetActive(false);
         }
@@ -220,7 +223,7 @@ namespace pp.RaftMods.AutoSorter
 
             int current = 0;
             var items = ItemManager.GetAllItems().ToArray();
-            CUtil.LogD($"Loading {items.Length} items...");
+            CUtil.LogD($"Loading UI elements for {items.Length} items...");
             GameObject go;
             foreach (var item in items)
             {
@@ -252,8 +255,13 @@ namespace pp.RaftMods.AutoSorter
             }
 
             mi_loaded = true;
+            if (mi_isVisible)
+            {
+                mi_itemAnchor.gameObject.SetActive(!(mi_currentStorage.Data?.AutoMode ?? true) && mi_currentStorage.IsUpgraded);
+                LoadWorkingData();
+            }
             mi_initOverlay.gameObject.SetActive(false);
-            CUtil.LogD("Done Loading items.");
+            CUtil.LogD("Done loading items.");
         }
 
         private IEnumerator ReloadItems()
@@ -266,7 +274,9 @@ namespace pp.RaftMods.AutoSorter
             bool pre;
             foreach (var item in mi_itemControls)
             {
-                vis = item.Value.Item.name.ToLower().Contains(mi_searchQuery) || string.IsNullOrEmpty(mi_searchQuery);
+                vis =   string.IsNullOrEmpty(mi_searchQuery) || 
+                        item.Value.Item.name.ToLower().Contains(mi_searchQuery) || 
+                        item.Value.Item.settings_Inventory.DisplayName.ToLower().Contains(mi_searchQuery);
                 pre = item.Value.gameObject.activeSelf;
                 item.Value.gameObject.SetActive(vis && visible < CAutoSorter.Config.MaxSearchResultItems);
                 item.Value.LoadStorage(mi_currentStorage);
