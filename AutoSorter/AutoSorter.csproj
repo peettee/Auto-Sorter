@@ -42,7 +42,8 @@
     <Compile Include="Config\ModConfig.cs" />
     <Compile Include="DTO\Protocol.cs" />
     <Compile Include="DTO\SceneStorage.cs" />
-    <Compile Include="DTO\StorageData.cs" />
+    <Compile Include="DTO\GeneralStorageData.cs" />
+    <Compile Include="DTO\SorterStorageData.cs" />
     <Compile Include="DTO\StorageRequestType.cs" />
     <None Include="LICENSE" />
     <Compile Include="UI\CUIDialog.cs" />

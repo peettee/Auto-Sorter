@@ -22,7 +22,7 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         public static CAutoSorter Get = null;
 
-        public const string VERSION                                 = "1.0.2";
+        public const string VERSION                                 = "1.0.3";
         public const string MOD_NAME                                = "AutoSorter";
         private const string MOD_NAMESPACE                          = "pp.RaftMods." + MOD_NAME;
 
@@ -37,11 +37,17 @@ namespace pp.RaftMods.AutoSorter
         /// Storage data which is loaded and saved to disk to preserve auto-sorter configurations.
         /// Combines the world name and the storage data for the world.
         /// </summary>
-        public Dictionary<string, CStorageData[]> SavedStorageData { get; private set; } = new Dictionary<string, CStorageData[]>();
+        public Dictionary<string, CSorterStorageData[]> SavedSorterStorageData { get; private set; } = new Dictionary<string, CSorterStorageData[]>();
+
+        /// <summary>
+        /// Additional storage data that is loaded and saved to disk to preserve certain settings for all storages (auto-sorter or not).
+        /// </summary>
+        public Dictionary<string, CGeneralStorageData[]> SavedAdditionaStorageData { get; private set; } = new Dictionary<string, CGeneralStorageData[]>();
 
         private string ModDataDirectory     => Path.Combine(Application.persistentDataPath, "Mods", MOD_NAME);
         private string ModConfigFilePath    => Path.Combine(ModDataDirectory, "config.json");
         private string ModDataFilePath      => Path.Combine(ModDataDirectory, "storagedata.json");
+        private string ModAdditionalDataFilePath => Path.Combine(ModDataDirectory, "additional_storagedata.json");
 
         private static CModConfig ExtraSettingsAPI_Settings = new CModConfig();
 
@@ -140,7 +146,8 @@ namespace pp.RaftMods.AutoSorter
                 CUtil.LogW("Failed to get sound manager on mod load.");
             }
 
-            LoadStorageData();
+            LoadSorterStorageData();
+            LoadAdditionalStorageData();
 
             CUtil.Log($"{MOD_NAME} v. {VERSION} loaded.");
         }
@@ -222,7 +229,8 @@ namespace pp.RaftMods.AutoSorter
         public override void WorldEvent_WorldSaved()
         {
             base.WorldEvent_WorldSaved();
-            SaveStorageData();
+            SaveSorterStorageData();
+            SaveAdditionalStorageData();
         }
         #endregion
 
@@ -309,19 +317,19 @@ namespace pp.RaftMods.AutoSorter
             }
         }
 
-        private void LoadStorageData()
+        private void LoadSorterStorageData()
         {
             try
             {
                 if (!File.Exists(ModDataFilePath)) return;
 
-                CStorageData[] data = JsonConvert.DeserializeObject<CStorageData[]>(File.ReadAllText(ModDataFilePath)) ?? throw new System.Exception("De-serialisation failed.");
-                SavedStorageData = data
+                CSorterStorageData[] data = JsonConvert.DeserializeObject<CSorterStorageData[]>(File.ReadAllText(ModDataFilePath)) ?? throw new System.Exception("De-serialisation failed.");
+                SavedSorterStorageData = data
                     .GroupBy(_o => _o.SaveName)
-                    .Select(_o => new KeyValuePair<string, CStorageData[]>(_o.Key, _o.ToArray()))
+                    .Select(_o => new KeyValuePair<string, CSorterStorageData[]>(_o.Key, _o.ToArray()))
                     .ToDictionary(_o => _o.Key, _o => _o.Value);
 
-                foreach (var allStorageData in SavedStorageData)
+                foreach (var allStorageData in SavedSorterStorageData)
                 {
                     foreach (var storageData in allStorageData.Value)
                     {
@@ -332,44 +340,42 @@ namespace pp.RaftMods.AutoSorter
             catch (System.Exception _e)
             {
                 CUtil.LogW("Failed to load saved mod data: " + _e.Message + ". Storage data wont be loaded.");
-                SavedStorageData = new Dictionary<string, CStorageData[]>();
+                SavedSorterStorageData = new Dictionary<string, CSorterStorageData[]>();
             }
         }
 
-        private void SaveStorageData()
+        private void SaveSorterStorageData()
         {
             try
-            {
+            { 
+                if(SceneStorages == null || SceneStorages.Count == 0) return;
+
                 if (File.Exists(ModDataFilePath))
                 {
                     File.Delete(ModDataFilePath);
                 }
 
-                if (SavedStorageData.ContainsKey(SaveAndLoad.CurrentGameFileName))
+                if (SavedSorterStorageData.ContainsKey(SaveAndLoad.CurrentGameFileName))
                 {
-                    SavedStorageData.Remove(SaveAndLoad.CurrentGameFileName);
+                    SavedSorterStorageData.Remove(SaveAndLoad.CurrentGameFileName);
                 }
 
-                if (SceneStorages != null &&
-                    SceneStorages.Count > 0)
+                foreach (var storage in SceneStorages)
                 {
-                    foreach (var storage in SceneStorages)
-                    {
-                        storage.Data?.OnBeforeSerialize();
-                    }
-
-                    SavedStorageData.Add(
-                        SaveAndLoad.CurrentGameFileName,
-                        SceneStorages
-                            .Where(_o => _o.AutoSorter && _o.IsUpgraded)
-                            .Select(_o => _o.Data)
-                            .ToArray());
+                    storage.Data?.OnBeforeSerialize();
                 }
+
+                SavedSorterStorageData.Add(
+                    SaveAndLoad.CurrentGameFileName,
+                    SceneStorages
+                        .Where(_o => _o.AutoSorter && _o.IsUpgraded)
+                        .Select(_o => _o.Data)
+                        .ToArray());
 
                 File.WriteAllText(
                     ModDataFilePath,
                     JsonConvert.SerializeObject(
-                        SavedStorageData.SelectMany(_o => _o.Value).ToArray(),
+                        SavedSorterStorageData.SelectMany(_o => _o.Value).ToArray(),
                         Formatting.None,
                         new JsonSerializerSettings()
                         {
@@ -379,6 +385,64 @@ namespace pp.RaftMods.AutoSorter
             catch (System.Exception _e)
             {
                 CUtil.LogW("Failed to save mod data: " + _e.Message + ". Storage data wont be saved.");
+            }
+        }
+
+        private void LoadAdditionalStorageData()
+        {
+            try
+            {
+                if (!File.Exists(ModAdditionalDataFilePath)) return;
+
+                CGeneralStorageData[] data = JsonConvert.DeserializeObject<CGeneralStorageData[]>(File.ReadAllText(ModAdditionalDataFilePath)) ?? throw new System.Exception("De-serialisation failed.");
+                SavedAdditionaStorageData = data
+                    .GroupBy(_o => _o.SaveName)
+                    .Select(_o => new KeyValuePair<string, CGeneralStorageData[]>(_o.Key, _o.ToArray()))
+                    .ToDictionary(_o => _o.Key, _o => _o.Value);
+            }
+            catch (System.Exception _e)
+            {
+                CUtil.LogW("Failed to load additional saved mod data: " + _e.Message + ". Storage data wont be loaded.");
+                SavedAdditionaStorageData = new Dictionary<string, CGeneralStorageData[]>();
+            }
+        }
+
+        private void SaveAdditionalStorageData()
+        {
+            try
+            {
+                if (SceneStorages == null || SceneStorages.Count == 0) return;
+
+                if (File.Exists(ModAdditionalDataFilePath))
+                {
+                    File.Delete(ModAdditionalDataFilePath);
+                }
+
+                if (SavedAdditionaStorageData.ContainsKey(SaveAndLoad.CurrentGameFileName))
+                {
+                    SavedAdditionaStorageData.Remove(SaveAndLoad.CurrentGameFileName);
+                }
+
+                SavedAdditionaStorageData.Add(
+                    SaveAndLoad.CurrentGameFileName,
+                    SceneStorages
+                        .Where(_o => _o.AdditionalData != null)
+                        .Select(_o => _o.AdditionalData)
+                        .ToArray());
+
+                File.WriteAllText(
+                    ModAdditionalDataFilePath,
+                    JsonConvert.SerializeObject(
+                        SavedAdditionaStorageData.SelectMany(_o => _o.Value).ToArray(),
+                        Formatting.None,
+                        new JsonSerializerSettings()
+                        {
+                            DefaultValueHandling = DefaultValueHandling.Ignore
+                        }) ?? throw new System.Exception("Failed to serialize"));
+            }
+            catch (System.Exception _e)
+            {
+                CUtil.LogW("Failed to save additional mod data: " + _e.Message + ". Storage data wont be saved.");
             }
         }
 
@@ -641,6 +705,27 @@ namespace pp.RaftMods.AutoSorter
                 }
 
                 Get.Broadcast(new CDTO(EStorageRequestType.STORAGE_DATA_UPDATE, storage.AutoSorter.ObjectIndex) { Info = storage.Data });
+            }
+        }
+
+        [HarmonyPatch(typeof(RemovePlaceables), "PickupBlock")]
+        private class CHarmonyPatch_RemovePlaceables_PickupBlock
+        {
+            [HarmonyPrefix]
+            private static void PickupBlock(RemovePlaceables __instance, Block block)
+            {
+                if (!(block is Storage_Small)) return;
+                var storage = Get.SceneStorages.FirstOrDefault(_o => _o.StorageComponent.ObjectIndex == block.ObjectIndex);
+                if (storage == null)
+                {
+                    CUtil.LogW("Failed to find matching storage on storage pickup. This is a bug and should be reported.");
+                    return;
+                }
+                if (!storage.IsUpgraded) return;
+                var pickupPlayer = Traverse.Create(__instance).Field("playerNetwork").GetValue<Network_Player>();
+                if(pickupPlayer == null || !pickupPlayer.IsLocalPlayer)
+                    return;
+                CUtil.ReimburseConstructionCosts(pickupPlayer, false);
             }
         }
         #endregion

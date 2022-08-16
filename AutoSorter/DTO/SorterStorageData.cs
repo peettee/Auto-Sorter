@@ -10,7 +10,7 @@ namespace pp.RaftMods.AutoSorter
     /// This data is loaded again whenever the player loads into the world and applied to storages.
     /// </summary>
     [System.Serializable]
-    public class CStorageData
+    public class CSorterStorageData
     {
         /// <summary>
         /// Name of the world this storage was saved in.
@@ -27,8 +27,7 @@ namespace pp.RaftMods.AutoSorter
         /// <summary>
         /// Auto mode enabled state as set by the player in the auto-sorter UI.
         /// </summary>
-        [DefaultValue(true)]
-        public bool AutoMode = true;
+        public bool AutoMode;
         /// <summary>
         /// Filters applied to the auto-sorter during runtime. Is not saved to the json data but loaded from the json data and used to easily and quickly access storage data during runtime.
         /// </summary>
@@ -38,10 +37,10 @@ namespace pp.RaftMods.AutoSorter
         [JsonProperty(PropertyName = "Filters")]
         private CItemFilter[] mi_filters = new CItemFilter[0];
 
-        public CStorageData() { }
-        public CStorageData(ulong _objectID)
-            : this(_objectID, 0, true, new CItemFilter[0]) { }
-        public CStorageData(ulong _objectID, int _priority, bool _autoMode, CItemFilter[] _itemStates)
+        public CSorterStorageData() { }
+        public CSorterStorageData(ulong _objectID)
+            : this(_objectID, 0, false, new CItemFilter[0]) { }
+        public CSorterStorageData(ulong _objectID, int _priority, bool _autoMode, CItemFilter[] _itemStates)
         {
             SaveName        = SaveAndLoad.CurrentGameFileName;
             ObjectID        = _objectID;
@@ -50,9 +49,9 @@ namespace pp.RaftMods.AutoSorter
             mi_filters      = _itemStates;
         }
 
-        public CStorageData Copy()
+        public CSorterStorageData Copy()
         {
-            return new CStorageData(ObjectID, Priority, AutoMode, mi_filters);
+            return new CSorterStorageData(ObjectID, Priority, AutoMode, mi_filters);
         }
 
         public void OnBeforeSerialize()

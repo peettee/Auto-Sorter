@@ -62,16 +62,26 @@ namespace pp.RaftMods.AutoSorter
             {
                 CAutoSorter.Get.SendTo(new CDTO(EStorageRequestType.REQUEST_STATE, ObjectIndex), mi_network.HostID);
             }
-            else if (mi_mod.SavedStorageData.ContainsKey(SaveAndLoad.CurrentGameFileName))
+            else
             {
-                var data = mi_mod.SavedStorageData[SaveAndLoad.CurrentGameFileName].FirstOrDefault(_o => _o.ObjectID == ObjectIndex);
-                if (data != null)
+                if (mi_mod.SavedSorterStorageData.ContainsKey(SaveAndLoad.CurrentGameFileName))
                 {
-                    mi_sceneStorage.Data = data;
-                    UpdateStorageMaterials();
+                    var data = mi_mod.SavedSorterStorageData[SaveAndLoad.CurrentGameFileName].FirstOrDefault(_o => _o.ObjectID == ObjectIndex);
+                    if (data != null)
+                    {
+                        mi_sceneStorage.Data = data;
+                        UpdateStorageMaterials();
+                    }
+                }
+                if (mi_mod.SavedAdditionaStorageData.ContainsKey(SaveAndLoad.CurrentGameFileName))
+                {
+                    var additionalData = mi_mod.SavedAdditionaStorageData[SaveAndLoad.CurrentGameFileName].FirstOrDefault(_o => _o.ObjectID == ObjectIndex);
+                    if (additionalData != null)
+                    {
+                        mi_sceneStorage.AdditionalData = additionalData;
+                    }
                 }
             }
-
             mi_loaded = true;
         }
 
@@ -84,12 +94,14 @@ namespace pp.RaftMods.AutoSorter
             if (mi_sceneStorage.IsUpgraded && HasInventorySpaceLeft)
             {
                 int itemsTransfered;
+                int actuallyAdded;
                 Inventory targetInventory;
                 int targetItemCount;
                 List<int> alreadyChecked;
                 foreach (var storage in mi_mod.SceneStorages)
                 {
-                    if (storage.IsUpgraded && (!CAutoSorter.Config.TransferFromAutosorters || storage == mi_sceneStorage)) continue;
+                    if ((storage.AdditionalData != null && storage.AdditionalData.Ignore) ||
+                        (storage.IsUpgraded && (!CAutoSorter.Config.TransferFromAutosorters || storage == mi_sceneStorage))) continue;
 
                     itemsTransfered = 0;
                     alreadyChecked  = new List<int>();
@@ -112,9 +124,13 @@ namespace pp.RaftMods.AutoSorter
 
                             if (!HasInventorySpaceLeft) break;
 
-                            itemsTransfered += targetItemCount;
-                            targetInventory.RemoveItem(slot.itemInstance.UniqueName, targetItemCount);
-                            CUtil.StackedAddInventory(mi_inventory, slot.itemInstance.UniqueName, targetItemCount);
+                            actuallyAdded = CUtil.StackedAddInventory(mi_inventory, slot.itemInstance.UniqueName, targetItemCount);
+                            CUtil.LogD($"Trying to add {targetItemCount} ({actuallyAdded} actual) {slot.itemInstance.UniqueName} to {mi_inventory.name} from {targetInventory.name}");
+                            if(actuallyAdded > 0)
+                            {
+                                itemsTransfered += actuallyAdded;
+                                targetInventory.RemoveItem(slot.itemInstance.UniqueName, actuallyAdded);
+                            }
                             yield return new WaitForEndOfFrame();
                         }
                     }
@@ -143,9 +159,13 @@ namespace pp.RaftMods.AutoSorter
 
                             if (!HasInventorySpaceLeft) break;
 
-                            itemsTransfered += targetItemCount;
-                            targetInventory.RemoveItem(itemIdx.UniqueName, targetItemCount);
-                            CUtil.StackedAddInventory(mi_inventory, itemIdx.UniqueName, targetItemCount);
+                            actuallyAdded = CUtil.StackedAddInventory(mi_inventory, itemIdx.UniqueName, targetItemCount);
+                            CUtil.LogD($"Trying to add {targetItemCount} ({actuallyAdded} actual) {slot.itemInstance.UniqueName} to {mi_inventory.name} from {targetInventory.name}");
+                            if (actuallyAdded > 0)
+                            {
+                                itemsTransfered += actuallyAdded;
+                                targetInventory.RemoveItem(itemIdx.UniqueName, actuallyAdded);
+                            }
 
                             yield return new WaitForEndOfFrame();
                         }
@@ -178,32 +198,29 @@ namespace pp.RaftMods.AutoSorter
                 case EStorageRequestType.REQUEST_STATE:  //a client block requested this blocks state, send it back
                     if (Raft_Network.IsHost)
                     {
-                        if (!mi_sceneStorage.IsUpgraded) return;
+                        if (!mi_sceneStorage.IsUpgraded && mi_sceneStorage.AdditionalData == null) return;
 
-                        CAutoSorter.Get.SendTo(new CDTO(EStorageRequestType.RESPOND_STATE, ObjectIndex) { Info = mi_sceneStorage.Data }, _remoteID);
+                        CAutoSorter.Get.SendTo(new CDTO(EStorageRequestType.RESPOND_STATE, ObjectIndex) { Info = mi_sceneStorage.Data, AdditionalInfo = mi_sceneStorage.AdditionalData }, _remoteID);
                     }
                     break;
                 case EStorageRequestType.RESPOND_STATE:
-                    if (_msg.Info == null)
-                    {
-                        CUtil.LogW("Invalid storage info received. Update the AutoSorter mod.");
-                        return;
-                    }
                     mi_sceneStorage.Data = _msg.Info;
-                    UpdateStorageMaterials();
+                    mi_sceneStorage.AdditionalData = _msg.AdditionalInfo;
+                    if (_msg.Info != null)
+                    {
+                        UpdateStorageMaterials();
+                    }
                     return;
                 case EStorageRequestType.UPGRADE:
-                    mi_sceneStorage.Data = _msg.Upgrade ? new CStorageData(_msg.ObjectIndex) : null;
+                    mi_sceneStorage.Data = _msg.Upgrade ? new CSorterStorageData(_msg.ObjectIndex) : null;
                     UpdateStorageMaterials();
                     return;
                 case EStorageRequestType.STORAGE_DATA_UPDATE:
-                    if (_msg.Info == null)
-                    {
-                        CUtil.LogW("Invalid storage info received. Update the AutoSorter mod.");
-                        return;
-                    }
                     mi_sceneStorage.Data = _msg.Info;
                     return;
+                case EStorageRequestType.STORAGE_IGNORE_UPDATE:
+                    mi_sceneStorage.AdditionalData = _msg.AdditionalInfo;
+                    break;
             }
         }
 
@@ -240,7 +257,7 @@ namespace pp.RaftMods.AutoSorter
                 mi_localPlayer.Inventory.RemoveItem(cost.Name, cost.Amount);
             }
 
-            mi_sceneStorage.Data = new CStorageData(ObjectIndex);
+            mi_sceneStorage.Data = new CSorterStorageData(ObjectIndex);
             UpdateStorageMaterials();
             SendUpgradeState(true);
             var soundRef = Traverse.Create(mi_sceneStorage.StorageComponent).Field("eventRef_open").GetValue<string>();
@@ -256,15 +273,7 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         public void Downgrade()
         {
-            int toAdd;
-            foreach (var cost in CAutoSorter.Config.UpgradeCosts)
-            {
-                toAdd = (int)(cost.Amount * CAutoSorter.Config.ReturnItemsOnDowngradeMultiplier);
-                if (toAdd > 0)
-                {
-                    CUtil.StackedAddInventory(mi_localPlayer.Inventory, cost.Name, toAdd);
-                }
-            }
+            CUtil.ReimburseConstructionCosts(mi_localPlayer, true);
             mi_sceneStorage.Data = null;
             UpdateStorageMaterials();
             SendUpgradeState(false);
@@ -289,6 +298,7 @@ namespace pp.RaftMods.AutoSorter
             {
                 Destroy(mi_customTexture);
             }
+
             mi_sceneStorage.Data = null;
             UpdateStorageMaterials();
             NetworkIDManager.RemoveNetworkID(this);

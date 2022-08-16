@@ -18,7 +18,11 @@ namespace pp.RaftMods.AutoSorter.Protocol
         /// <summary>
         /// Storage data which contains the auto-sorter configuration and might be sent along to other clients.
         /// </summary>
-        public CStorageData Info;
+        public CSorterStorageData Info;
+        /// <summary>
+        /// Storage data for all storages regardless if they are auto-sorters or not.
+        /// </summary>
+        public CGeneralStorageData AdditionalInfo;
         /// <summary>
         /// Is true if this message is sent on storage upgrade.
         /// </summary>

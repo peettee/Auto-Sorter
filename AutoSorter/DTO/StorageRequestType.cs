@@ -25,5 +25,9 @@
         /// Special message which is sent whenever an auto-sorter transfers items to sync up storage inventories between players.
         /// </summary>
         STORAGE_INVENTORY_UPDATE    = -45,
+        /// <summary>
+        /// Sent whenever the ignore state of a storage changed.
+        /// </summary>
+        STORAGE_IGNORE_UPDATE       = -46,
     }
 }
