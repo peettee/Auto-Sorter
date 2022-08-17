@@ -317,7 +317,11 @@ namespace pp.RaftMods.AutoSorter
                 foreach (var mat in materials)
                 {
                     if (!mat) continue;
-                    if (mat.HasProperty("_Diffuse"))
+                    if (mat.HasProperty("_MainTex")) //probably std mat
+                    {
+                        mat.color = mi_sceneStorage.IsUpgraded && CAutoSorter.Config.ChangeStorageColorOnUpgrade ? Color.red : Color.white;
+                    }
+                    else if (mat.HasProperty("_Diffuse"))
                     {
                         if (mi_sceneStorage.IsUpgraded && CAutoSorter.Config.ChangeStorageColorOnUpgrade)
                         {
@@ -340,10 +344,6 @@ namespace pp.RaftMods.AutoSorter
                         {
                             mat.SetTexture("_Diffuse", mi_originalTexture);
                         }
-                    }
-                    else if(mat.HasProperty("_MainTex")) //probably std mat
-                    {
-                        mat.color = mi_sceneStorage.IsUpgraded && CAutoSorter.Config.ChangeStorageColorOnUpgrade ? Color.red : Color.white;
                     }
                 }
                 rend.materials = materials;
