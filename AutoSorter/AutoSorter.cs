@@ -44,6 +44,8 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         public Dictionary<string, CGeneralStorageData[]> SavedAdditionaStorageData { get; private set; } = new Dictionary<string, CGeneralStorageData[]>();
 
+        public List<Inventory> DirtyInventories { get; private set; } = new List<Inventory>();
+
         private string ModDataDirectory     => Path.Combine(Application.persistentDataPath, "Mods", MOD_NAME);
         private string ModConfigFilePath    => Path.Combine(ModDataDirectory, "config.json");
         private string ModDataFilePath      => Path.Combine(ModDataDirectory, "storagedata.json");
@@ -219,7 +221,14 @@ namespace pp.RaftMods.AutoSorter
         {
             base.WorldEvent_WorldUnloaded();
 
-            SceneStorages.Clear();
+            mi_checkChests = false;
+            StopAllCoroutines();
+
+            DirtyInventories.Clear();
+            if (SceneStorages != null)
+            {
+                SceneStorages.Clear();
+            }
             SceneStorages = null;
         }
 
@@ -464,6 +473,8 @@ namespace pp.RaftMods.AutoSorter
                     {
                         yield return storage.AutoSorter.CheckItems();
                     }
+                    DirtyInventories.Clear();
+                    foreach (var storage in SceneStorages) storage.IsInventoryDirty = false;
                     mi_lastCheckDurationSeconds = (System.DateTime.UtcNow - now).TotalSeconds;
                 }
                 if (mi_lastCheckDurationSeconds < Config.CheckIntervalSeconds)
@@ -564,6 +575,17 @@ namespace pp.RaftMods.AutoSorter
                                     JsonConvert.SerializeObject(_object));
         }
 
+        private void SetInventoryDirty(Inventory _inventory)
+        {
+            if (_inventory is PlayerInventory) return;
+            if (DirtyInventories.Contains(_inventory)) return;
+            var storageForInventory = SceneStorages?.FirstOrDefault(_o => _o.AutoSorter.Inventory == _inventory);
+            if (storageForInventory == null) return;
+            DirtyInventories.Add(_inventory);
+            storageForInventory.IsInventoryDirty = true;
+            CUtil.LogD("Inventory for storage " + storageForInventory.AutoSorter.name + " is marked as dirty.");
+        }
+        
         #region PATCHES
         [HarmonyPatch(typeof(NetworkUpdateManager), "Deserialize")]
         public class CHarmonyPatch_NetworkUpdateManager_Deserialize
@@ -727,6 +749,49 @@ namespace pp.RaftMods.AutoSorter
                     return;
                 CUtil.ReimburseConstructionCosts(pickupPlayer, false);
             }
+        }
+        
+        [HarmonyPatch(typeof(Inventory), "AddItem", typeof(string), typeof(int))]
+        private class CHarmonyPatch_Inventory_AddItem_1
+        {
+            [HarmonyPrefix]
+            private static void AddItem(Inventory __instance, string uniqueItemName, int amount) => Get.SetInventoryDirty(__instance);
+        }
+
+        [HarmonyPatch(typeof(Inventory), "AddItem", typeof(string), typeof(Slot), typeof(int))]
+        private class CHarmonyPatch_Inventory_AddItem_2
+        {
+            [HarmonyPrefix]
+            private static void AddItem(Inventory __instance, string uniqueItemName, Slot slot, int amount) => Get.SetInventoryDirty(__instance);
+        }
+
+        [HarmonyPatch(typeof(Inventory), "AddItem", typeof(ItemInstance), typeof(bool))]
+        private class CHarmonyPatch_Inventory_AddItem_3
+        {
+            [HarmonyPrefix]
+            private static void AddItem(Inventory __instance, ItemInstance itemInstance, bool dropIfFull = true) => Get.SetInventoryDirty(__instance);
+        }
+        
+        [HarmonyPatch(typeof(Inventory), "MoveItem")]
+        private class CHarmonyPatch_Inventory_MoveItem
+        {
+            [HarmonyPrefix]
+            private static void MoveItem(Inventory __instance, Slot slot, UnityEngine.EventSystems.PointerEventData eventData)
+            {
+                if (slot == null || slot.IsEmpty || __instance.secondInventory == null) return; //if items are moved within the player inventory, ignore.
+
+                Slot movedToSlot    = Traverse.Create<Inventory>().Field("toSlot").GetValue<Slot>();
+                Inventory movedTo   = movedToSlot != null ? Traverse.Create(movedToSlot).Field("inventory").GetValue<Inventory>() : null;
+                if (movedTo == null || movedTo == __instance) return; //if items are moved within the same inventory, ignore.
+                Get.SetInventoryDirty(movedTo);
+            }
+        }
+
+        [HarmonyPatch(typeof(Inventory), "SetSlotsFromRGD")]
+        private class CHarmonyPatch_Inventory_SetSlotsFromRGD
+        {
+            [HarmonyPrefix]
+            private static void SetSlotsFromRGD(Inventory __instance, RGD_Slot[] slots) => Get.SetInventoryDirty(__instance);
         }
         #endregion
     }

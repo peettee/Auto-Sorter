@@ -18,8 +18,9 @@ namespace pp.RaftMods.AutoSorter
     {
         private const int CREATIVE_INFINITE_COUNT = 2147483647;
 
-        public Network_Player LocalPlayer { get => mi_localPlayer; }
-        public CSceneStorage SceneStorage { get => mi_sceneStorage; }
+        public Network_Player LocalPlayer => mi_localPlayer;
+        public CSceneStorage SceneStorage => mi_sceneStorage;
+        public Inventory Inventory => mi_inventory;
 
         private bool HasInventorySpaceLeft => mi_inventory?.allSlots.Any(_o => _o.active && !_o.locked && !_o.StackIsFull()) ?? false;
 
@@ -101,7 +102,8 @@ namespace pp.RaftMods.AutoSorter
                 foreach (var storage in mi_mod.SceneStorages)
                 {
                     if ((storage.AdditionalData != null && storage.AdditionalData.Ignore) ||
-                        (storage.IsUpgraded && (!CAutoSorter.Config.TransferFromAutosorters || storage == mi_sceneStorage))) continue;
+                        (storage.IsUpgraded && (!CAutoSorter.Config.TransferFromAutosorters || storage == mi_sceneStorage)) ||
+                        storage.IsInventoryDirty) continue; //if the inventory has been altered, wait for the next cycle to transfer items from it so there are no issues with priority.
 
                     itemsTransfered = 0;
                     alreadyChecked  = new List<int>();

@@ -10,5 +10,6 @@
         public CGeneralStorageData AdditionalData;
         public CStorageBehaviour AutoSorter;
         public Storage_Small StorageComponent;
+        public bool IsInventoryDirty;
     }
 }
