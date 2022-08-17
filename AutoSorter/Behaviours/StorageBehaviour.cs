@@ -314,6 +314,7 @@ namespace pp.RaftMods.AutoSorter
                 var materials = rend.materials;
                 foreach (var mat in materials)
                 {
+                    if (!mat) continue;
                     if (mat.HasProperty("_Diffuse"))
                     {
                         if (mi_sceneStorage.IsUpgraded && CAutoSorter.Config.ChangeStorageColorOnUpgrade)
@@ -321,6 +322,11 @@ namespace pp.RaftMods.AutoSorter
                             if (mi_customTexture == null) //pretty heavy operation to make chests red that use the Vegetation shader. There is no way (afaik) to change the main color.
                             {
                                 mi_originalTexture = mat.GetTexture("_Diffuse") as Texture2D;
+                                if(mi_originalTexture == null)
+                                {
+                                    CUtil.LogW("Material had a property _Diffuse, but it was not a texture property on \"" + mi_sceneStorage.StorageComponent.name + "\". This could be caused by a mod incompatibility. Make sure you report this issue.");
+                                    continue;
+                                }
                                 mi_customTexture = CUtil.MakeReadable(mi_originalTexture, TextureFormat.ARGB32, true);
                                 mi_customTexture.SetPixels(mi_customTexture.GetPixels().Select(_o => new Color(Mathf.Min(_o.r + 0.35f, 0.9f), _o.g - 0.1f, _o.b - 0.1f, _o.a)).ToArray());
                                 mi_customTexture.Apply();
