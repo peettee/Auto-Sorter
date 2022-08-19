@@ -23,10 +23,6 @@
         /// </summary>
         public UpgradeCost[] UpgradeCosts;
         /// <summary>
-        /// If true auto-sorters will also transfer items from other auto-sorters.
-        /// </summary>
-        public bool TransferFromAutosorters;
-        /// <summary>
         /// Multiplier applied when returning items to the player on downgrade.
         /// </summary>
         public float ReturnItemsOnDowngradeMultiplier;
@@ -44,7 +40,6 @@
             CheckIntervalSeconds                = 2;
             MaxSearchResultItems                = 25;
             Debug                               = false;
-            TransferFromAutosorters             = false;
             ChangeStorageColorOnUpgrade         = true;
             ReturnItemsOnDowngradeMultiplier    = 0.5f;
             UpgradeCosts                        = new[]
@@ -75,7 +70,6 @@
             CheckIntervalSeconds                = (int)ExtraSettingsAPI_GetSliderValue(nameof(CheckIntervalSeconds));
             MaxSearchResultItems                = (int)ExtraSettingsAPI_GetSliderValue(nameof(MaxSearchResultItems));
             Debug                               = ExtraSettingsAPI_GetCheckboxState(nameof(Debug));
-            TransferFromAutosorters             = ExtraSettingsAPI_GetCheckboxState(nameof(TransferFromAutosorters));
             ReturnItemsOnDowngradeMultiplier    = ExtraSettingsAPI_GetSliderValue(nameof(ReturnItemsOnDowngradeMultiplier));
             ChangeStorageColorOnUpgrade         = ExtraSettingsAPI_GetCheckboxState(nameof(ChangeStorageColorOnUpgrade));
             CUtil.LogD("Settings reload!\n" + this);
@@ -87,7 +81,6 @@
 Check interval: {CheckIntervalSeconds}
 Debug: {Debug}
 InitialHelpShown: {InitialHelpShown}
-TransferFromAS: {TransferFromAutosorters}
 ReturnItems: {ReturnItemsOnDowngradeMultiplier}
 MaxSearchResults: {MaxSearchResultItems}
 ChangeColor: {ChangeStorageColorOnUpgrade}";

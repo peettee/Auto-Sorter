@@ -2,7 +2,7 @@
   "name": "AutoSorter",
   "author": "Pete",
   "description": "Adds the ability to upgrade all storage types to auto-sorters. Auto-sorters are able to transfer items from other storages on your raft automatically.",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "license": "MIT",
   "icon": "icon.png",
   "banner": "banner.jpg",
@@ -17,12 +17,6 @@
       "name": "ChangeStorageColorOnUpgrade",
       "text": "change storage color on upgrade",
       "default": true
-    },
-    {
-      "type": "checkbox",
-      "name": "TransferFromAutosorters",
-      "text": "transfer from auto sorters",
-      "default": false
     },
     {
       "type": "slider",

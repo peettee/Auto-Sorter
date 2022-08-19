@@ -102,7 +102,7 @@ namespace pp.RaftMods.AutoSorter
                 foreach (var storage in mi_mod.SceneStorages)
                 {
                     if ((storage.AdditionalData != null && storage.AdditionalData.Ignore) ||
-                        (storage.IsUpgraded && (!CAutoSorter.Config.TransferFromAutosorters || storage == mi_sceneStorage)) ||
+                        storage == mi_sceneStorage ||
                         storage.IsInventoryDirty) continue; //if the inventory has been altered, wait for the next cycle to transfer items from it so there are no issues with priority.
 
                     itemsTransfered = 0;
@@ -123,11 +123,12 @@ namespace pp.RaftMods.AutoSorter
 
                             targetItemCount = targetInventory.GetItemCount(slot.itemInstance.UniqueName);
                             if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) continue;
-
+                            
                             if (!HasInventorySpaceLeft) break;
 
                             if (!CheckIsEligibleToTransfer(slot.itemInstance, storage, out int _allowedTransfer)) continue;
                             if (_allowedTransfer > 0) targetItemCount = _allowedTransfer;
+
                             actuallyAdded = CUtil.StackedAddInventory(mi_inventory, slot.itemInstance.UniqueName, targetItemCount);
                             CUtil.LogD($"Trying to add {targetItemCount} ({actuallyAdded} actual) {slot.itemInstance.UniqueName} to {mi_inventory.name} from {targetInventory.name}");
                             if(actuallyAdded > 0)
@@ -165,6 +166,7 @@ namespace pp.RaftMods.AutoSorter
 
                             if (!CheckIsEligibleToTransfer(slot.itemInstance, storage, out int _allowedTransfer)) continue;
                             if (_allowedTransfer > 0) targetItemCount = _allowedTransfer;
+
                             actuallyAdded = CUtil.StackedAddInventory(mi_inventory, itemIdx.UniqueName, targetItemCount);
                             CUtil.LogD($"Trying to add {targetItemCount} ({actuallyAdded} actual) {slot.itemInstance.UniqueName} to {mi_inventory.name} from {targetInventory.name}");
                             if (actuallyAdded > 0)
@@ -362,21 +364,21 @@ namespace pp.RaftMods.AutoSorter
         private bool CheckIsEligibleToTransfer(ItemInstance _item, CSceneStorage _storage, out int _itemRestriction) //make sure if we are transferring between auto-sorters we use priorities to prevent item loops.
         {
             _itemRestriction = -1;
-            if (_storage.IsUpgraded)
+            if (!_storage.IsUpgraded) return true;
+            if (_storage.Data.AutoMode)
             {
-                if (_storage.Data.AutoMode)
-                {
-                    if (_storage.Data.Priority < mi_sceneStorage.Data.Priority) return true; //if the other sorte is in auto mode we check if it contains the item we want to transfer. if it does and its priority is either higher or the same than ours, dont transfer items.
-                }
-                else if (!_storage.Data.Filters.ContainsKey(_item.UniqueIndex))
-                {
-                    if (_storage.Data.Priority < mi_sceneStorage.Data.Priority) return true;
-                }
-                else if(!_storage.Data.Filters[_item.UniqueIndex].NoAmountControl)
-                {
-                    _itemRestriction = _storage.AutoSorter.Inventory.GetItemCount(_item.UniqueName) - _storage.Data.Filters[_item.UniqueIndex].MaxAmount;
-                    if (_itemRestriction > 0) return true;
-                }
+                if (_storage.Data.Priority < mi_sceneStorage.Data.Priority) return true; //if the other sorter is in auto mode we check if it contains the item we want to transfer. if it does and its priority is either higher or the same than ours, dont transfer items.
+            }
+            else if (!_storage.Data.Filters.ContainsKey(_item.UniqueIndex)) return true;
+            else if (_storage.Data.Filters[_item.UniqueIndex].NoAmountControl)
+            {
+                if (_storage.Data.Priority < mi_sceneStorage.Data.Priority) return true;
+            }
+            else
+            {
+                if (_storage.Data.Priority < mi_sceneStorage.Data.Priority) return true;
+                _itemRestriction = _storage.AutoSorter.Inventory.GetItemCount(_item.UniqueName) - _storage.Data.Filters[_item.UniqueIndex].MaxAmount;
+                if (_itemRestriction > 0) return true;
             }
             return false;
         }

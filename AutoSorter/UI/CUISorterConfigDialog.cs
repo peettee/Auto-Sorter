@@ -63,6 +63,8 @@ namespace pp.RaftMods.AutoSorter
         private MenuType mi_previousMenuType;
         private bool mi_isHidden;
 
+        private EAdditionalItemFilterType mi_additionalItemFilter;
+
         private void Awake()
         {
             mi_content          = transform.Find("Content");
@@ -283,15 +285,45 @@ namespace pp.RaftMods.AutoSorter
         {
             mi_statusText.text = "Searching...";
 
+            var postProcessQuery = mi_searchQuery;
+            mi_additionalItemFilter = EAdditionalItemFilterType.NONE;
+            if (!string.IsNullOrEmpty(postProcessQuery))
+            {
+                if (postProcessQuery.ToLower().Contains("#active"))
+                {
+                    mi_additionalItemFilter |= EAdditionalItemFilterType.ACTIVE;
+                    postProcessQuery = postProcessQuery.ToLower().Replace("#active", "").Trim();
+                }
+                if (postProcessQuery.ToLower().Contains("#inactive"))
+                {
+                    mi_additionalItemFilter |= EAdditionalItemFilterType.INACTIVE;
+                    postProcessQuery = postProcessQuery.ToLower().Replace("#inactive", "").Trim();
+                }
+                if (postProcessQuery.ToLower().Contains("#amount"))
+                {
+                    mi_additionalItemFilter |= EAdditionalItemFilterType.AMOUNT_CONTROL;
+                    postProcessQuery = postProcessQuery.ToLower().Replace("#amount", "").Trim();
+                }
+            }
+
             int current = 0;
             int visible = 0;
             bool vis;
             bool pre;
+
             foreach (var item in mi_itemControls)
             {
-                vis =   string.IsNullOrEmpty(mi_searchQuery) || 
-                        item.Value.Item.name.ToLower().Contains(mi_searchQuery) || 
-                        item.Value.Item.settings_Inventory.DisplayName.ToLower().Contains(mi_searchQuery);
+                vis = string.IsNullOrEmpty(mi_searchQuery)
+                        ||
+                        (
+                            !string.IsNullOrEmpty(postProcessQuery)
+                            &&
+                            (
+                                item.Value.Item.name.ToLower().Contains(postProcessQuery) ||
+                                item.Value.Item.settings_Inventory.DisplayName.ToLower().Contains(postProcessQuery)
+                            )
+                        )
+                        || AdditionalFilterApplies(item.Value);
                 pre = item.Value.gameObject.activeSelf;
                 item.Value.gameObject.SetActive(vis && visible < CAutoSorter.Config.MaxSearchResultItems);
                 item.Value.LoadStorage(mi_currentStorage);
@@ -556,6 +588,17 @@ namespace pp.RaftMods.AutoSorter
             yield return ReloadItems();
         }
     
+        private bool AdditionalFilterApplies(CUISorterConfigItem _item)
+        {
+            return  mi_additionalItemFilter != EAdditionalItemFilterType.NONE
+                    &&
+                    (
+                        ((mi_additionalItemFilter & EAdditionalItemFilterType.ACTIVE) != 0 && _item.ItemToggle.isOn) ||
+                        ((mi_additionalItemFilter & EAdditionalItemFilterType.INACTIVE) != 0 && !_item.ItemToggle.isOn) ||
+                        ((mi_additionalItemFilter & EAdditionalItemFilterType.AMOUNT_CONTROL) != 0 && !_item.AmountControlToggle.isOn)
+                    );
+        }
+
         [System.Flags]
         private enum EAdditionalItemFilterType
         {

@@ -13,11 +13,11 @@ namespace pp.RaftMods.AutoSorter
         /// The Raft item object this UI element represents.
         /// </summary>
         public Item_Base Item => mi_representsItem;
+        public Toggle ItemToggle { get; private set; }
+        public Toggle AmountControlToggle { get; private set; }
 
-        public Toggle ItemToggle;
         private Image mi_itemImage;
         private TextMeshProUGUI mi_itemText;
-        private Toggle mi_noAmountControlToggle;
         private TMP_InputField mi_maxAmountInput;
 
         private Item_Base mi_representsItem;
@@ -34,7 +34,7 @@ namespace pp.RaftMods.AutoSorter
             mi_itemImage               = transform.Find("Item_Image").GetChild(0).GetComponent<Image>();
             mi_itemText                = transform.Find("Item_Name").GetComponent<TextMeshProUGUI>();
             ItemToggle                 = transform.Find("Item_Toggle").GetComponent<Toggle>();
-            mi_noAmountControlToggle   = transform.Find("Toggle_Amount").GetComponent<Toggle>();
+            AmountControlToggle   = transform.Find("Toggle_Amount").GetComponent<Toggle>();
             mi_maxAmountInput          = transform.Find("Input_Amount").GetComponent<TMP_InputField>();
 
             mi_representsItem           = _item;
@@ -42,7 +42,7 @@ namespace pp.RaftMods.AutoSorter
             mi_itemText.text            = _item.settings_Inventory.DisplayName;
 
             ItemToggle.onValueChanged.AddListener(new UnityEngine.Events.UnityAction<bool>(OnItemToggled));
-            mi_noAmountControlToggle.onValueChanged.AddListener(new UnityEngine.Events.UnityAction<bool>(OnAmountControlToggled));
+            AmountControlToggle.onValueChanged.AddListener(new UnityEngine.Events.UnityAction<bool>(OnAmountControlToggled));
             mi_maxAmountInput.onValueChanged.AddListener(new UnityEngine.Events.UnityAction<string>(OnMaxAmountValueChanged));
 
             mi_maxAmountInput.onSelect.AddListener(new UnityEngine.Events.UnityAction<string>(OnInputSelected));
@@ -127,9 +127,9 @@ namespace pp.RaftMods.AutoSorter
         {
             if (ItemToggle.isOn)
             {
-                mi_noAmountControlToggle.gameObject.SetActive(true);
-                mi_noAmountControlToggle.SetIsOnWithoutNotify(mi_storage.Data.Filters[mi_representsItem.UniqueIndex].NoAmountControl);
-                if (mi_noAmountControlToggle.isOn)
+                AmountControlToggle.gameObject.SetActive(true);
+                AmountControlToggle.SetIsOnWithoutNotify(mi_storage.Data.Filters[mi_representsItem.UniqueIndex].NoAmountControl);
+                if (AmountControlToggle.isOn)
                 {
                     mi_maxAmountInput.gameObject.SetActive(false);
                 }
@@ -141,7 +141,7 @@ namespace pp.RaftMods.AutoSorter
                 return;
             }
 
-            mi_noAmountControlToggle.gameObject.SetActive(false);
+            AmountControlToggle.gameObject.SetActive(false);
             mi_maxAmountInput.gameObject.SetActive(false);
         }
     }
