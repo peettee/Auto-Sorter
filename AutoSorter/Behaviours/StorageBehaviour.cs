@@ -250,7 +250,7 @@ namespace pp.RaftMods.AutoSorter
         /// <returns>True if the upgrade was successful, false if the player does not have enough resources to upgrade.</returns>
         public bool Upgrade()
         {
-            if (CAutoSorter.Config.UpgradeCosts.Any(_o => mi_localPlayer.Inventory.GetItemCount(ItemManager.GetItemByName(_o.Name)) < _o.Amount))
+            if (CAutoSorter.Config.UpgradeCosts.Any(_o => mi_localPlayer.Inventory.GetItemCount(_o.Name) < _o.Amount))
             {
                 var notif = ComponentManager<HNotify>.Value.AddNotification(
                     HNotify.NotificationType.normal, 

@@ -305,6 +305,7 @@ namespace pp.RaftMods.AutoSorter
             catch (System.Exception _e)
             {
                 CUtil.LogW("Failed to save mod configuration: " + _e.Message);
+                CUtil.LogD(_e.StackTrace);
             }
         }
 
@@ -323,6 +324,7 @@ namespace pp.RaftMods.AutoSorter
             catch (System.Exception _e)
             {
                 CUtil.LogW("Failed to load mod configuration: " + _e.Message + ". Check your configuration file.");
+                CUtil.LogD(_e.StackTrace);
             }
         }
 
@@ -334,9 +336,9 @@ namespace pp.RaftMods.AutoSorter
 
                 CSorterStorageData[] data = JsonConvert.DeserializeObject<CSorterStorageData[]>(File.ReadAllText(ModDataFilePath)) ?? throw new System.Exception("De-serialisation failed.");
                 SavedSorterStorageData = data
+                    .Where(_o => !string.IsNullOrEmpty(_o.SaveName))
                     .GroupBy(_o => _o.SaveName)
-                    .Select(_o => new KeyValuePair<string, CSorterStorageData[]>(_o.Key, _o.ToArray()))
-                    .ToDictionary(_o => _o.Key, _o => _o.Value);
+                    .ToDictionary(_o => _o.Key, _o => _o.ToArray());
 
                 foreach (var allStorageData in SavedSorterStorageData)
                 {
@@ -349,6 +351,7 @@ namespace pp.RaftMods.AutoSorter
             catch (System.Exception _e)
             {
                 CUtil.LogW("Failed to load saved mod data: " + _e.Message + ". Storage data wont be loaded.");
+                CUtil.LogD(_e.StackTrace);
                 SavedSorterStorageData = new Dictionary<string, CSorterStorageData[]>();
             }
         }
@@ -394,6 +397,7 @@ namespace pp.RaftMods.AutoSorter
             catch (System.Exception _e)
             {
                 CUtil.LogW("Failed to save mod data: " + _e.Message + ". Storage data wont be saved.");
+                CUtil.LogD(_e.StackTrace);
             }
         }
 
