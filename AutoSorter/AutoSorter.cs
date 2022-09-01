@@ -589,13 +589,20 @@ namespace pp.RaftMods.AutoSorter
             storageForInventory.IsInventoryDirty = true;
             CUtil.LogD("Inventory for storage " + storageForInventory.AutoSorter.name + " is marked as dirty.");
         }
-        
+
+        private IEnumerator WaitAndShowUI(CSceneStorage _storage)
+        {
+            while (mi_configDialog == null) yield return new WaitForEndOfFrame();
+            if (!_storage.StorageComponent.IsOpen) yield break;
+            mi_configDialog.Show(_storage);
+        }
+
         #region PATCHES
         [HarmonyPatch(typeof(NetworkUpdateManager), "Deserialize")]
-        public class CHarmonyPatch_NetworkUpdateManager_Deserialize
+        private class CHarmonyPatch_NetworkUpdateManager_Deserialize
         {
             [HarmonyPrefix]
-            private static bool NetworkUpdateManager_Deserialize(Packet_Multiple packet, CSteamID remoteID) 
+            private static bool Deserialize(Packet_Multiple packet, CSteamID remoteID) 
             {
                 List<Message> resultMessages    = packet.messages.ToList();
                 List<Message> messages          = packet.messages.ToList();
@@ -672,66 +679,7 @@ namespace pp.RaftMods.AutoSorter
         {
             //Intercept create block method so we can check each created block and register it if it is a storage
             [HarmonyPostfix]
-            private static void BlockCreator_CreateBlock(BlockCreator __instance, Block __result) => Get.OnBlockCreated(__result as Storage_Small);
-        }
-
-        [HarmonyPatch(typeof(Storage_Small), "Open")]
-        private class CHarmonyPatch_Storage_Small_Open
-        {
-            private static Coroutine mi_routine;
-
-            [HarmonyPostfix]
-            private static void Storage_Small_Open(Storage_Small __instance, Network_Player player)
-            {
-                if (player == null || !player.IsLocalPlayer) return;
-
-                var storage = Get.SceneStorages.FirstOrDefault(_o => _o.StorageComponent.ObjectIndex == __instance.ObjectIndex);
-                if (storage == null)
-                {
-                    CUtil.LogW("Failed to find matching storage on storage open. This is a bug and should be reported.");
-                    return;
-                }
-
-                if(Get.mi_configDialog == null) //If the UI is not fully loaded directly after entering the scene, make sure we wait until its available before showing it to the user.
-                {
-                    if(mi_routine != null)
-                    {
-                        Get.StopCoroutine(mi_routine);
-                    }
-                    mi_routine = Get.StartCoroutine(WaitAndShowUI(storage));
-                    return;
-                }
-
-                Get.mi_configDialog.Show(storage);
-            }
-
-            private static IEnumerator WaitAndShowUI(CSceneStorage _storage)
-            {
-                while (Get.mi_configDialog == null) yield return new WaitForEndOfFrame();
-                if (!_storage.StorageComponent.IsOpen) yield break;
-                Get.mi_configDialog.Show(_storage);
-            }
-        }
-
-        [HarmonyPatch(typeof(Storage_Small), "Close")]
-        private class CHarmonyPatch_Storage_Small_Close
-        {
-            [HarmonyPostfix]
-            private static void Storage_Small_Close(Storage_Small __instance, Network_Player player)
-            {
-                if (player == null || !player.IsLocalPlayer) return;
-
-                Get.mi_configDialog?.Hide();
-
-                var storage = Get.SceneStorages.FirstOrDefault(_o => _o.StorageComponent.ObjectIndex == __instance.ObjectIndex);
-                if (storage == null)
-                {
-                    CUtil.LogW("Failed to find matching storage on storage close. This is a bug and should be reported.");
-                    return;
-                }
-
-                Get.Broadcast(new CDTO(EStorageRequestType.STORAGE_DATA_UPDATE, storage.AutoSorter.ObjectIndex) { Info = storage.Data });
-            }
+            private static void CreateBlock(BlockCreator __instance, Block __result) => Get.OnBlockCreated(__result as Storage_Small);
         }
 
         [HarmonyPatch(typeof(RemovePlaceables), "PickupBlock")]
@@ -754,47 +702,79 @@ namespace pp.RaftMods.AutoSorter
                 CUtil.ReimburseConstructionCosts(pickupPlayer, false);
             }
         }
-        
-        [HarmonyPatch(typeof(Inventory), "AddItem", typeof(string), typeof(int))]
-        private class CHarmonyPatch_Inventory_AddItem_1
+
+        [HarmonyPatch(typeof(Storage_Small))]
+        private class CHarmonyPatch_Storage_Small
         {
-            [HarmonyPrefix]
+            private static Coroutine mi_routine;
+
+            [HarmonyPostfix][HarmonyPatch("Open")]
+            private static void Open(Storage_Small __instance, Network_Player player)
+            {
+                if (player == null || !player.IsLocalPlayer) return;
+
+                var storage = Get.SceneStorages.FirstOrDefault(_o => _o.StorageComponent.ObjectIndex == __instance.ObjectIndex);
+                if (storage == null)
+                {
+                    CUtil.LogW("Failed to find matching storage on storage open. This is a bug and should be reported.");
+                    return;
+                }
+
+                if (Get.mi_configDialog == null) //If the UI is not fully loaded directly after entering the scene, make sure we wait until its available before showing it to the user.
+                {
+                    if (mi_routine != null)
+                    {
+                        Get.StopCoroutine(mi_routine);
+                    }
+                    mi_routine = Get.StartCoroutine(Get.WaitAndShowUI(storage));
+                    return;
+                }
+
+                Get.mi_configDialog.Show(storage);
+            }
+
+            [HarmonyPostfix][HarmonyPatch("Close")]
+            private static void Close(Storage_Small __instance, Network_Player player)
+            {
+                if (player == null || !player.IsLocalPlayer) return;
+
+                Get.mi_configDialog?.Hide();
+
+                var storage = Get.SceneStorages.FirstOrDefault(_o => _o.StorageComponent.ObjectIndex == __instance.ObjectIndex);
+                if (storage == null)
+                {
+                    CUtil.LogW("Failed to find matching storage on storage close. This is a bug and should be reported.");
+                    return;
+                }
+
+                Get.Broadcast(new CDTO(EStorageRequestType.STORAGE_DATA_UPDATE, storage.AutoSorter.ObjectIndex) { Info = storage.Data });
+            }
+        }
+
+        [HarmonyPatch(typeof(Inventory))]
+        private class CHarmonyPatch_Inventory
+        {
+            [HarmonyPrefix][HarmonyPatch("AddItem", typeof(string), typeof(int))]
             private static void AddItem(Inventory __instance, string uniqueItemName, int amount) => Get.SetInventoryDirty(__instance);
-        }
 
-        [HarmonyPatch(typeof(Inventory), "AddItem", typeof(string), typeof(Slot), typeof(int))]
-        private class CHarmonyPatch_Inventory_AddItem_2
-        {
-            [HarmonyPrefix]
+            [HarmonyPrefix][HarmonyPatch("AddItem", typeof(string), typeof(Slot), typeof(int))]
             private static void AddItem(Inventory __instance, string uniqueItemName, Slot slot, int amount) => Get.SetInventoryDirty(__instance);
-        }
 
-        [HarmonyPatch(typeof(Inventory), "AddItem", typeof(ItemInstance), typeof(bool))]
-        private class CHarmonyPatch_Inventory_AddItem_3
-        {
-            [HarmonyPrefix]
+            [HarmonyPrefix][HarmonyPatch("AddItem", typeof(ItemInstance), typeof(bool))]
             private static void AddItem(Inventory __instance, ItemInstance itemInstance, bool dropIfFull = true) => Get.SetInventoryDirty(__instance);
-        }
-        
-        [HarmonyPatch(typeof(Inventory), "MoveItem")]
-        private class CHarmonyPatch_Inventory_MoveItem
-        {
-            [HarmonyPrefix]
+
+            [HarmonyPrefix][HarmonyPatch("MoveItem")]
             private static void MoveItem(Inventory __instance, Slot slot, UnityEngine.EventSystems.PointerEventData eventData)
             {
                 if (slot == null || slot.IsEmpty || __instance.secondInventory == null) return; //if items are moved within the player inventory, ignore.
 
-                Slot movedToSlot    = Traverse.Create<Inventory>().Field("toSlot").GetValue<Slot>();
-                Inventory movedTo   = movedToSlot != null ? Traverse.Create(movedToSlot).Field("inventory").GetValue<Inventory>() : null;
+                Slot movedToSlot = Traverse.Create<Inventory>().Field("toSlot").GetValue<Slot>();
+                Inventory movedTo = movedToSlot != null ? Traverse.Create(movedToSlot).Field("inventory").GetValue<Inventory>() : null;
                 if (movedTo == null || movedTo == __instance) return; //if items are moved within the same inventory, ignore.
                 Get.SetInventoryDirty(movedTo);
             }
-        }
 
-        [HarmonyPatch(typeof(Inventory), "SetSlotsFromRGD")]
-        private class CHarmonyPatch_Inventory_SetSlotsFromRGD
-        {
-            [HarmonyPrefix]
+            [HarmonyPrefix][HarmonyPatch("SetSlotsFromRGD")]
             private static void SetSlotsFromRGD(Inventory __instance, RGD_Slot[] slots) => Get.SetInventoryDirty(__instance);
         }
         #endregion
