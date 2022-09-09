@@ -22,7 +22,7 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         public static CAutoSorter Get = null;
 
-        public const string VERSION                                 = "1.2.0";
+        public const string VERSION                                 = "1.3.0";
         public const string MOD_NAME                                = "AutoSorter";
         private const string MOD_NAMESPACE                          = "pp.RaftMods." + MOD_NAME;
 
@@ -34,7 +34,7 @@ namespace pp.RaftMods.AutoSorter
         private const string UI_HELP_TEXT_PATH                      = "Assets/Config/help.txt";
 
         /// <summary>
-        /// Storage data which is loaded and saved to disk to preserve auto-sorter configurations.
+        /// Storage data which is loaded and saved to disk to preserve auto-sorter configurations. 
         /// Combines the world name and the storage data for the world.
         /// </summary>
         public Dictionary<string, CSorterStorageData[]> SavedSorterStorageData { get; private set; } = new Dictionary<string, CSorterStorageData[]>();
@@ -174,6 +174,7 @@ namespace pp.RaftMods.AutoSorter
                         --i;
                     }
                 }
+                SceneStorages.Clear();
             }
 
             if (mi_harmony != null)
@@ -538,14 +539,14 @@ namespace pp.RaftMods.AutoSorter
 
             if (SceneStorages.Any(_o => _o.StorageComponent == _storage)) return;
 
-            CUtil.LogD("Registering storage " + _storage.gameObject);
-
             var sceneStorage = new CSceneStorage();
             sceneStorage.StorageComponent   = _storage;
             sceneStorage.AutoSorter = _storage.gameObject.AddComponent<CStorageBehaviour>();
             sceneStorage.StorageComponent.networkedIDBehaviour = sceneStorage.AutoSorter;
             sceneStorage.AutoSorter.Load(this, sceneStorage, mi_configDialog);
             SceneStorages.Add(sceneStorage);
+
+            CUtil.LogD("Registered storage \"" + _storage.gameObject.name + "\" Total storages: " + SceneStorages.Count);
         }
 
         private void OnBlockCreated(Storage_Small _storage)
@@ -564,6 +565,11 @@ namespace pp.RaftMods.AutoSorter
             if (SceneStorages?.Contains(_storage) ?? false)
             {
                 SceneStorages.Remove(_storage);
+            }
+
+            if (SceneStorages != null)
+            {
+                CUtil.LogD("Unregistered storage \"" + _storage.StorageComponent.gameObject.name + "\" Total storages: " + SceneStorages.Count);
             }
         }
 
@@ -776,6 +782,37 @@ namespace pp.RaftMods.AutoSorter
 
             [HarmonyPrefix][HarmonyPatch("SetSlotsFromRGD")]
             private static void SetSlotsFromRGD(Inventory __instance, RGD_Slot[] slots) => Get.SetInventoryDirty(__instance);
+        }
+        #endregion
+
+        #region COMMANDS
+        [ConsoleCommand("asListStorages", "Lists all storages and their status.")]
+        public static string ListStorages(string[] _args)
+        {
+            return "### Tracked scene storages ###\n" + 
+                (
+                    Get.SceneStorages == null ? 
+                        "No registered storages in scene." :
+                        "- " + string.Join("\n- ", 
+                            Get.SceneStorages.Select(_o => $"\"{_o.StorageComponent.gameObject.name}\" Dirty: {_o.IsInventoryDirty} AutoSorter: {_o.IsUpgraded} " +
+                                $"{(_o.IsUpgraded ? $" Priority: {_o.Data.Priority} Filters: {_o.Data.Filters.Count}" : "")}" +
+                                $"{(_o.AdditionalData != null ? " Ignore: " + _o.AdditionalData.Ignore : "")}")));
+        }
+
+        [ConsoleCommand("asTestReduceUses", "Sets the remaining uses of all items in the players inventory to half the max uses.")]
+        public static string ReduceUses(string[] _args)
+        {
+            int c = 0;
+            foreach (var slot in Get.mi_network.GetLocalPlayer().Inventory.allSlots)
+            {
+                if (slot.HasValidItemInstance())
+                {
+                    slot.itemInstance.Uses = (int)Mathf.Ceil(slot.itemInstance.BaseItemMaxUses * 0.5f);
+                    CUtil.Log("Setting max uses of " + slot.itemInstance.UniqueName + " to " + slot.itemInstance.Uses);
+                    c++;
+                }
+            }
+            return "Set item uses on " + c + " items.";
         }
         #endregion
     }

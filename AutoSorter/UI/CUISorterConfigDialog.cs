@@ -306,6 +306,12 @@ namespace pp.RaftMods.AutoSorter
                 }
             }
 
+            var exactMatch = postProcessQuery.StartsWith("\"");
+            if(exactMatch)
+            {
+                postProcessQuery = postProcessQuery.Replace("\"", "");
+            }
+
             int current = 0;
             int visible = 0;
             bool vis;
@@ -313,14 +319,25 @@ namespace pp.RaftMods.AutoSorter
 
             foreach (var item in mi_itemControls)
             {
-                vis = string.IsNullOrEmpty(mi_searchQuery)
+                vis =   string.IsNullOrEmpty(mi_searchQuery)
                         ||
                         (
                             !string.IsNullOrEmpty(postProcessQuery)
-                            &&
+                            && 
                             (
-                                item.Value.Item.name.ToLower().Contains(postProcessQuery) ||
-                                item.Value.Item.settings_Inventory.DisplayName.ToLower().Contains(postProcessQuery)
+                                (
+                                    !exactMatch
+                                    &&
+                                    (
+                                        item.Value.Item.name.ToLower().Contains(postProcessQuery) ||
+                                        item.Value.Item.settings_Inventory.DisplayName.ToLower().Contains(postProcessQuery)
+                                    )
+                                )
+                                ||
+                                (
+                                    item.Value.Item.name.ToLower() == postProcessQuery ||
+                                    item.Value.Item.settings_Inventory.DisplayName.ToLower() == postProcessQuery
+                                )
                             )
                         )
                         || AdditionalFilterApplies(item.Value);
