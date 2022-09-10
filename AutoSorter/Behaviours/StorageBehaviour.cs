@@ -96,7 +96,14 @@ namespace pp.RaftMods.AutoSorter
             {
                 int itemsTransfered;
                 Inventory targetInventory;
-                List<int> alreadyChecked;
+                List<int> toCheck = mi_sceneStorage.Data.AutoMode ? 
+                                        mi_inventory.allSlots
+                                            .Where(_o => _o.active && !_o.IsEmpty && !_o.locked)
+                                            .Select(_o => _o.itemInstance.UniqueIndex)
+                                            .Distinct()
+                                            .ToList() : 
+                                        mi_sceneStorage.Data.Filters.Select(_o => _o.Key).ToList();
+
                 foreach (var storage in mi_mod.SceneStorages)
                 {
                     if ((storage.AdditionalData != null && storage.AdditionalData.Ignore) ||
@@ -104,45 +111,20 @@ namespace pp.RaftMods.AutoSorter
                         storage.IsInventoryDirty) continue; //if the inventory has been altered, wait for the next cycle to transfer items from it so there are no issues with priority.
 
                     itemsTransfered = 0;
-                    alreadyChecked  = new List<int>();
                     targetInventory = storage.StorageComponent.GetInventoryReference();
 
-                    if (mi_sceneStorage.Data.AutoMode)
+                    foreach (Slot slot in targetInventory.allSlots.Reverse<Slot>())
                     {
-                        foreach (Slot slot in mi_inventory.allSlots)
-                        {
-                            if (!slot.active ||
-                                !slot.HasValidItemInstance() ||
-                                slot.locked) continue;
+                        if (!slot.active ||
+                            !slot.HasValidItemInstance() ||
+                            slot.locked) continue;
 
-                            if (alreadyChecked.Contains(slot.itemInstance.UniqueIndex)) continue;
+                        if (!toCheck.Contains(slot.itemInstance.UniqueIndex)) continue;
 
-                            alreadyChecked.Add(slot.itemInstance.UniqueIndex);
-
-                            var transferResult = TransferItemsFromInventory(storage, targetInventory, slot.itemInstance, out itemsTransfered, null);
-                            if (transferResult == null) break;
-                            if (!(bool)transferResult) continue;
-                            yield return new WaitForEndOfFrame();
-                        }
-                    }
-                    else
-                    {
-                        foreach (Slot slot in targetInventory.allSlots)
-                        {
-                            if (!slot.active ||
-                                !slot.HasValidItemInstance() ||
-                                slot.locked) continue;
-
-                            if (alreadyChecked.Contains(slot.itemInstance.UniqueIndex) ||
-                                !mi_sceneStorage.Data.Filters.ContainsKey(slot.itemInstance.UniqueIndex)) continue;
-
-                            alreadyChecked.Add(slot.itemInstance.UniqueIndex);
-
-                            var transferResult = TransferItemsFromInventory(storage, targetInventory, slot.itemInstance, out itemsTransfered, mi_sceneStorage.Data.Filters[slot.itemInstance.UniqueIndex]);
-                            if (transferResult == null) break;
-                            if (!(bool)transferResult) continue;
-                            yield return new WaitForEndOfFrame();
-                        }
+                        var transferResult = TransferItemsFromInventory(storage, targetInventory, slot, out itemsTransfered, mi_sceneStorage.Data.AutoMode ? null : mi_sceneStorage.Data.Filters[slot.itemInstance.UniqueIndex]);
+                        if (transferResult == null) break;
+                        if (!(bool)transferResult) continue;
+                        yield return new WaitForEndOfFrame();
                     }
                 
                     if(itemsTransfered > 0)
@@ -218,7 +200,8 @@ namespace pp.RaftMods.AutoSorter
         /// <returns>True if the upgrade was successful, false if the player does not have enough resources to upgrade.</returns>
         public bool Upgrade()
         {
-            if (CAutoSorter.Config.UpgradeCosts.Any(_o => mi_localPlayer.Inventory.GetItemCount(_o.Name) < _o.Amount))
+            if (!GameModeValueManager.GetCurrentGameModeValue().playerSpecificVariables.unlimitedResources && 
+                CAutoSorter.Config.UpgradeCosts.Any(_o => _o.Item != null && mi_localPlayer.Inventory.GetItemCount(_o.Item) < _o.Amount))
             {
                 var notif = ComponentManager<HNotify>.Value.AddNotification(
                     HNotify.NotificationType.normal, 
@@ -282,28 +265,46 @@ namespace pp.RaftMods.AutoSorter
             mi_loaded = false;
         }
         
-        private bool? TransferItemsFromInventory(CSceneStorage _targetStorage, Inventory _targetInventory, ItemInstance _item, out int _itemsTransfered, CItemFilter _filter = null)
+        private bool? TransferItemsFromInventory(CSceneStorage _targetStorage, Inventory _targetInventory, Slot _slot, out int _itemsTransfered, CItemFilter _filter = null)
         {
-            int targetItemCount = _targetInventory.GetItemCount(_item.UniqueName);
+            int targetItemCount = _slot.itemInstance.Amount;
             _itemsTransfered = 0;
 
             if (_filter != null && !_filter.NoAmountControl)
             {
-                targetItemCount = Mathf.Min(Mathf.Max(_filter.MaxAmount - mi_inventory.GetItemCount(_item.UniqueName), 0), targetItemCount);
+                targetItemCount = Mathf.Min(Mathf.Max(_filter.MaxAmount - mi_inventory.GetItemCount(_slot.itemInstance.UniqueName), 0), targetItemCount);
             }
 
-            if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) return true;
+            if (targetItemCount <= 0) return true;
 
             if (!HasInventorySpaceLeft) return null;
 
-            if (!CheckIsEligibleToTransfer(_item, _targetStorage, out int _allowedTransfer)) return true;
+            if (!CheckIsEligibleToTransfer(_slot.itemInstance, _targetStorage, out int _allowedTransfer)) return true;
             if (_allowedTransfer > 0) targetItemCount = _allowedTransfer;
 
-            _itemsTransfered = CUtil.StackedAddInventory(mi_inventory, _item.UniqueName, targetItemCount);
-            CUtil.LogD($"Trying to add {targetItemCount} ({_itemsTransfered} actual) {_item.UniqueName} to {mi_inventory.name} from {_targetInventory.name}");
-            if (_itemsTransfered > 0)
+            if (!CUtil.HasSpaceLeftForItem(mi_inventory, _slot.itemInstance.UniqueName)) return true;
+
+            var instance = _slot.itemInstance.Clone(); 
+            if (targetItemCount < instance.Amount) //if not all items are transferred we set the uses to max so we do not lose them. If all items are transferred we keep the usage as specified in the item instance.
             {
-                _targetInventory.RemoveItem(_item.UniqueName, _itemsTransfered);
+                instance.SetUsesToMax();
+            }
+            targetItemCount = Mathf.Min(targetItemCount, instance.Amount);
+            instance.Amount = targetItemCount; //if target item count is larger than the actual amount in this slot, use the amount in slot otherwise the target count.
+
+            mi_inventory.AddItem(instance, false);
+            _itemsTransfered = targetItemCount - instance.Amount; //determine how many items have been actually transferred
+
+            CUtil.LogD($"Trying to add {targetItemCount} ({_itemsTransfered} actual) {_slot.itemInstance.UniqueName} to {mi_inventory.name} from {_targetInventory.name}");
+
+            _slot.itemInstance.Amount -= _itemsTransfered; //remove the actually transferred items from the source slot
+            if (_slot.itemInstance.Amount <= 0)
+            {
+                _slot.SetItem(null); //delete source slot item if amount is 0
+            }
+            else
+            {
+                _slot.RefreshComponents(); //if items remained after transfer, refresh slot UI
             }
 
             return true;

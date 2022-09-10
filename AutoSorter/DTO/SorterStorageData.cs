@@ -29,6 +29,11 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         public bool AutoMode;
         /// <summary>
+        /// Saved search query for this sorter.
+        /// </summary>
+        [DefaultValue("")]
+        public string SearchQuery = "";
+        /// <summary>
         /// Filters applied to the auto-sorter during runtime. Is not saved to the json data but loaded from the json data and used to easily and quickly access storage data during runtime.
         /// </summary>
         [JsonIgnore]

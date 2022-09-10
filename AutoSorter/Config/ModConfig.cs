@@ -1,4 +1,6 @@
-﻿namespace pp.RaftMods.AutoSorter
+﻿using Newtonsoft.Json;
+
+namespace pp.RaftMods.AutoSorter
 {
     /// <summary>
     /// Mod configuration class which represents user configuration for the mod and takes care of handling Extra Settings API mod compatibility.
@@ -96,6 +98,9 @@ ChangeColor: {ChangeStorageColorOnUpgrade}";
         public string Name;
         public int Amount;
 
+        [JsonIgnore]
+        public Item_Base Item;
+
         public UpgradeCost() { }
         public UpgradeCost(string _name, int _amount)
         {
@@ -107,5 +112,19 @@ ChangeColor: {ChangeStorageColorOnUpgrade}";
         {
             return new Cost(ItemManager.GetItemByName(Name), Amount);
         }
+
+        public void Load()
+        {
+            Item = ItemManager.GetItemByName(Name);
+            if (!Item)
+            {
+                CUtil.LogW("Specified item \"" + Name + "\" in the config upgrade costs could not be found. Please check your config file. The item will be ignored.");
+            }
+            if(Amount <= 0)
+            {
+                CUtil.LogW("Item amount on item \"" + Name + "\" in the config upgrade costs is invalid. Please check your config file.");
+            }
+        }
+
     }
 }

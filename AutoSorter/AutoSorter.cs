@@ -22,7 +22,7 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         public static CAutoSorter Get = null;
 
-        public const string VERSION                                 = "1.3.0";
+        public const string VERSION                                 = "1.4.0";
         public const string MOD_NAME                                = "AutoSorter";
         private const string MOD_NAMESPACE                          = "pp.RaftMods." + MOD_NAME;
 
@@ -321,6 +321,10 @@ namespace pp.RaftMods.AutoSorter
                 }
                 CUtil.LogD("Load configuration.");
                 Config = JsonConvert.DeserializeObject<CModConfig>(File.ReadAllText(ModConfigFilePath)) ?? throw new System.Exception("De-serialisation failed.");
+                if(Config.UpgradeCosts != null)
+                {
+                    foreach (var cost in Config.UpgradeCosts) cost.Load();
+                }
             }
             catch (System.Exception _e)
             {
@@ -470,7 +474,7 @@ namespace pp.RaftMods.AutoSorter
                     break;
                 }
 
-                if (SceneStorages != null)
+                if (!GameModeValueManager.GetCurrentGameModeValue().playerSpecificVariables.unlimitedResources && SceneStorages != null)
                 {
                     System.DateTime now = System.DateTime.UtcNow;
                     var storages = SceneStorages.Where(_o => _o.IsUpgraded).OrderByDescending(_o => _o.Data.Priority);
@@ -799,7 +803,7 @@ namespace pp.RaftMods.AutoSorter
                                 $"{(_o.AdditionalData != null ? " Ignore: " + _o.AdditionalData.Ignore : "")}")));
         }
 
-        [ConsoleCommand("asTestReduceUses", "Sets the remaining uses of all items in the players inventory to half the max uses.")]
+        [ConsoleCommand("asTestReduceUses", "Sets the remaining uses of all items in the players inventory to half the maximum uses.")]
         public static string ReduceUses(string[] _args)
         {
             int c = 0;
@@ -815,7 +819,7 @@ namespace pp.RaftMods.AutoSorter
             return "Set item uses on " + c + " items.";
         }
 
-        [ConsoleCommand("asTestMaxUseableAndStackable", "Prints all items that have maxUses > 1 and a stacksize > 1.")]
+        [ConsoleCommand("asTestMaxUseableAndStackable", "Prints all items that have maxUses > 1 and a stack size > 1.")]
         public static string PrintMaxUseableAndStackable(string[] _args)
         {
             var items = ItemManager.GetAllItems().Where(_o => _o.MaxUses > 1 && _o.settings_Inventory.Stackable);

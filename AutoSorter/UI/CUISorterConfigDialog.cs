@@ -168,8 +168,8 @@ namespace pp.RaftMods.AutoSorter
 
             mi_currentStorage = _storage;
 
-            mi_searchQuery = "";
-            mi_inputField.text = "";
+            mi_searchQuery = mi_currentStorage.Data?.SearchQuery ?? "";
+            mi_inputField.text = mi_searchQuery;
 
             mi_itemAnchor.gameObject.SetActive(_storage.IsUpgraded && mi_loaded && !_storage.Data.AutoMode);
 
@@ -317,8 +317,11 @@ namespace pp.RaftMods.AutoSorter
             bool vis;
             bool pre;
 
+            CUtil.LogD("Refilter item list with query \"" + mi_searchQuery + "\" and options " + mi_additionalItemFilter);
+
             foreach (var item in mi_itemControls)
             {
+                item.Value.LoadStorage(mi_currentStorage);
                 vis =   string.IsNullOrEmpty(mi_searchQuery)
                         ||
                         (
@@ -343,7 +346,6 @@ namespace pp.RaftMods.AutoSorter
                         || AdditionalFilterApplies(item.Value);
                 pre = item.Value.gameObject.activeSelf;
                 item.Value.gameObject.SetActive(vis && visible < CAutoSorter.Config.MaxSearchResultItems);
-                item.Value.LoadStorage(mi_currentStorage);
                 visible += vis ? 1 : 0;
                 ++current;
                 if (current >= LOAD_ITEMS_PER_FRAME)
@@ -450,6 +452,7 @@ namespace pp.RaftMods.AutoSorter
                 return;
             }
             mi_searchQuery = trimmedInput;
+            mi_currentStorage.Data.SearchQuery = mi_searchQuery;
             Reload();
         }
 
