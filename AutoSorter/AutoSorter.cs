@@ -484,7 +484,7 @@ namespace pp.RaftMods.AutoSorter
                 }
                 if (mi_lastCheckDurationSeconds < Config.CheckIntervalSeconds)
                 {
-                    yield return new WaitForSeconds(Config.CheckIntervalSeconds);
+                    yield return new WaitForSeconds((float)(Config.CheckIntervalSeconds - mi_lastCheckDurationSeconds));
                 }
             }
         }
@@ -813,6 +813,13 @@ namespace pp.RaftMods.AutoSorter
                 }
             }
             return "Set item uses on " + c + " items.";
+        }
+
+        [ConsoleCommand("asTestMaxUseableAndStackable", "Prints all items that have maxUses > 1 and a stacksize > 1.")]
+        public static string PrintMaxUseableAndStackable(string[] _args)
+        {
+            var items = ItemManager.GetAllItems().Where(_o => _o.MaxUses > 1 && _o.settings_Inventory.Stackable);
+            return "### Items ###\n" + (items.Any() ? "- " + string.Join("\n- ", items) : "None");
         }
         #endregion
     }

@@ -95,9 +95,7 @@ namespace pp.RaftMods.AutoSorter
             if (mi_sceneStorage.IsUpgraded && HasInventorySpaceLeft)
             {
                 int itemsTransfered;
-                int actuallyAdded;
                 Inventory targetInventory;
-                int targetItemCount;
                 List<int> alreadyChecked;
                 foreach (var storage in mi_mod.SceneStorages)
                 {
@@ -121,21 +119,9 @@ namespace pp.RaftMods.AutoSorter
 
                             alreadyChecked.Add(slot.itemInstance.UniqueIndex);
 
-                            targetItemCount = targetInventory.GetItemCount(slot.itemInstance.UniqueName);
-                            if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) continue;
-
-                            if (!HasInventorySpaceLeft) break;
-
-                            if (!CheckIsEligibleToTransfer(slot.itemInstance, storage, out int _allowedTransfer)) continue;
-                            if (_allowedTransfer > 0) targetItemCount = _allowedTransfer;
-
-                            actuallyAdded = CUtil.StackedAddInventory(mi_inventory, slot.itemInstance.UniqueName, targetItemCount);
-                            CUtil.LogD($"Trying to add {targetItemCount} ({actuallyAdded} actual) {slot.itemInstance.UniqueName} to {mi_inventory.name} from {targetInventory.name}");
-                            if(actuallyAdded > 0)
-                            {
-                                itemsTransfered += actuallyAdded;
-                                targetInventory.RemoveItem(slot.itemInstance.UniqueName, actuallyAdded);
-                            }
+                            var transferResult = TransferItemsFromInventory(storage, targetInventory, slot.itemInstance, out itemsTransfered, null);
+                            if (transferResult == null) break;
+                            if (!(bool)transferResult) continue;
                             yield return new WaitForEndOfFrame();
                         }
                     }
@@ -152,29 +138,9 @@ namespace pp.RaftMods.AutoSorter
 
                             alreadyChecked.Add(slot.itemInstance.UniqueIndex);
 
-                            var itemFilter = mi_sceneStorage.Data.Filters[slot.itemInstance.UniqueIndex];
-                            targetItemCount = targetInventory.GetItemCount(itemFilter.UniqueName);
-
-                            if (!itemFilter.NoAmountControl)
-                            {
-                                targetItemCount = Mathf.Min(Mathf.Max(itemFilter.MaxAmount - mi_inventory.GetItemCount(itemFilter.UniqueName), 0), targetItemCount);
-                            }
-
-                            if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) continue;
-
-                            if (!HasInventorySpaceLeft) break;
-
-                            if (!CheckIsEligibleToTransfer(slot.itemInstance, storage, out int _allowedTransfer)) continue;
-                            if (_allowedTransfer > 0) targetItemCount = _allowedTransfer;
-
-                            actuallyAdded = CUtil.StackedAddInventory(mi_inventory, itemFilter.UniqueName, targetItemCount);
-                            CUtil.LogD($"Trying to add {targetItemCount} ({actuallyAdded} actual) {slot.itemInstance.UniqueName} to {mi_inventory.name} from {targetInventory.name}");
-                            if (actuallyAdded > 0)
-                            {
-                                itemsTransfered += actuallyAdded;
-                                targetInventory.RemoveItem(itemFilter.UniqueName, actuallyAdded);
-                            }
-
+                            var transferResult = TransferItemsFromInventory(storage, targetInventory, slot.itemInstance, out itemsTransfered, mi_sceneStorage.Data.Filters[slot.itemInstance.UniqueIndex]);
+                            if (transferResult == null) break;
+                            if (!(bool)transferResult) continue;
                             yield return new WaitForEndOfFrame();
                         }
                     }
@@ -316,10 +282,9 @@ namespace pp.RaftMods.AutoSorter
             mi_loaded = false;
         }
         
-        private bool TransferItemsFromInventory(CSceneStorage _targetStorage, ItemInstance _item, out int _itemsTransfered, CItemFilter _filter = null)
+        private bool? TransferItemsFromInventory(CSceneStorage _targetStorage, Inventory _targetInventory, ItemInstance _item, out int _itemsTransfered, CItemFilter _filter = null)
         {
-            Inventory inventory = _targetStorage.StorageComponent.GetInventoryReference();
-            int targetItemCount = inventory.GetItemCount(_item.UniqueName);
+            int targetItemCount = _targetInventory.GetItemCount(_item.UniqueName);
             _itemsTransfered = 0;
 
             if (_filter != null && !_filter.NoAmountControl)
@@ -329,16 +294,16 @@ namespace pp.RaftMods.AutoSorter
 
             if (targetItemCount <= 0 || targetItemCount == CREATIVE_INFINITE_COUNT) return true;
 
-            if (!HasInventorySpaceLeft) return false;
+            if (!HasInventorySpaceLeft) return null;
 
             if (!CheckIsEligibleToTransfer(_item, _targetStorage, out int _allowedTransfer)) return true;
             if (_allowedTransfer > 0) targetItemCount = _allowedTransfer;
 
             _itemsTransfered = CUtil.StackedAddInventory(mi_inventory, _item.UniqueName, targetItemCount);
-            CUtil.LogD($"Trying to add {targetItemCount} ({_itemsTransfered} actual) {_item.UniqueName} to {mi_inventory.name} from {inventory.name}");
+            CUtil.LogD($"Trying to add {targetItemCount} ({_itemsTransfered} actual) {_item.UniqueName} to {mi_inventory.name} from {_targetInventory.name}");
             if (_itemsTransfered > 0)
             {
-                inventory.RemoveItem(_item.UniqueName, _itemsTransfered);
+                _targetInventory.RemoveItem(_item.UniqueName, _itemsTransfered);
             }
 
             return true;
