@@ -94,7 +94,7 @@ namespace pp.RaftMods.AutoSorter
         {
             if (mi_sceneStorage.IsUpgraded && HasInventorySpaceLeft)
             {
-                int itemsTransfered;
+                int totalItemsTransfered;
                 Inventory targetInventory;
                 List<int> toCheck = mi_sceneStorage.Data.AutoMode ? 
                                         mi_inventory.allSlots
@@ -110,7 +110,7 @@ namespace pp.RaftMods.AutoSorter
                         storage == mi_sceneStorage ||
                         storage.IsInventoryDirty) continue; //if the inventory has been altered, wait for the next cycle to transfer items from it so there are no issues with priority.
 
-                    itemsTransfered = 0;
+                    totalItemsTransfered = 0;
                     targetInventory = storage.StorageComponent.GetInventoryReference();
 
                     foreach (Slot slot in targetInventory.allSlots.Reverse<Slot>())
@@ -121,13 +121,14 @@ namespace pp.RaftMods.AutoSorter
 
                         if (!toCheck.Contains(slot.itemInstance.UniqueIndex)) continue;
 
-                        var transferResult = TransferItemsFromInventory(storage, targetInventory, slot, out itemsTransfered, mi_sceneStorage.Data.AutoMode ? null : mi_sceneStorage.Data.Filters[slot.itemInstance.UniqueIndex]);
+                        var transferResult = TransferItemsFromInventory(storage, targetInventory, slot, out int itemsTransferred, mi_sceneStorage.Data.AutoMode ? null : mi_sceneStorage.Data.Filters[slot.itemInstance.UniqueIndex]);
+                        totalItemsTransfered += itemsTransferred;
                         if (transferResult == null) break;
                         if (!(bool)transferResult) continue;
                         yield return new WaitForEndOfFrame();
                     }
-                
-                    if(itemsTransfered > 0)
+
+                    if(totalItemsTransfered > 0)
                     {
                         CAutoSorter.Get.BroadcastInventoryState(storage.AutoSorter);
                         CAutoSorter.Get.BroadcastInventoryState(this);
