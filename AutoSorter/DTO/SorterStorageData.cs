@@ -47,7 +47,10 @@ namespace pp.RaftMods.AutoSorter
             : this(_objectID, 0, false, new CItemFilter[0]) { }
         public CSorterStorageData(ulong _objectID, int _priority, bool _autoMode, CItemFilter[] _itemStates)
         {
-            SaveName        = SaveAndLoad.CurrentGameFileName;
+            if (Raft_Network.IsHost) //only the host knows the currently loaded save game name.
+            {
+                SaveName = SaveAndLoad.CurrentGameFileName;
+            }
             ObjectID        = _objectID;
             Priority        = _priority;
             AutoMode        = _autoMode;

@@ -149,8 +149,6 @@ namespace pp.RaftMods.AutoSorter
                 CUtil.LogD("Received network message but storage is not fully loaded. Dropping message...");
                 return;
             }
-            Plant p = null;
-            Traverse.Create(p).Method("ResetStats").GetValue();
 
             switch (_msg.Type)
             {
@@ -176,9 +174,17 @@ namespace pp.RaftMods.AutoSorter
                     return;
                 case EStorageRequestType.STORAGE_DATA_UPDATE:
                     mi_sceneStorage.Data = _msg.Info;
+                    if(Raft_Network.IsHost)
+                    {
+                        mi_sceneStorage.Data.SaveName = SaveAndLoad.CurrentGameFileName; //make sure we set the save name again on the hosts side as the clients do not know about the save name
+                    }
                     return;
                 case EStorageRequestType.STORAGE_IGNORE_UPDATE:
                     mi_sceneStorage.AdditionalData = _msg.AdditionalInfo;
+                    if (Raft_Network.IsHost)
+                    {
+                        mi_sceneStorage.AdditionalData.SaveName = SaveAndLoad.CurrentGameFileName; //make sure we set the save name again on the hosts side as the clients do not know about the save name
+                    }
                     break;
             }
         }
@@ -352,8 +358,6 @@ namespace pp.RaftMods.AutoSorter
                 rend.materials = materials;
             }
         }
-
-
 
         private void SendUpgradeState(bool _isUpgraded)
         {

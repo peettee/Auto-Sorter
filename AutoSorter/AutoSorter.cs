@@ -92,6 +92,10 @@ namespace pp.RaftMods.AutoSorter
 
         private static Dictionary<uint, CStorageBehaviour> mi_registeredNetworkBehaviours = new Dictionary<uint, CStorageBehaviour>();
 
+        private bool mi_runningStorageCheck;
+        private Queue<CSceneStorage> mi_registerQueuedStorages = new Queue<CSceneStorage>();
+        private Queue<CSceneStorage> mi_unregisterQueuedStorages = new Queue<CSceneStorage>();
+
         #region ENGINE_CALLBACKS
         /// <summary>
         /// Called when the mod is loaded.
@@ -177,6 +181,9 @@ namespace pp.RaftMods.AutoSorter
                 SceneStorages.Clear();
             }
 
+            mi_registerQueuedStorages.Clear();
+            mi_unregisterQueuedStorages.Clear();
+
             if (mi_harmony != null)
             {
                 mi_harmony.UnpatchAll(MOD_NAMESPACE);
@@ -213,6 +220,7 @@ namespace pp.RaftMods.AutoSorter
             StartCoroutine(mi_configDialog.LoadItems());
             mi_checkChests = true;
             mi_chestRoutineHandle = StartCoroutine(CheckStorages());
+            CUtil.LogD($"World \"{SaveAndLoad.CurrentGameFileName}\" loaded.");
         }
 
         /// <summary>
@@ -231,6 +239,9 @@ namespace pp.RaftMods.AutoSorter
                 SceneStorages.Clear();
             }
             SceneStorages = null;
+
+            mi_unregisterQueuedStorages.Clear();
+            mi_registerQueuedStorages.Clear();
         }
 
         /// <summary>
@@ -476,6 +487,7 @@ namespace pp.RaftMods.AutoSorter
 
                 if (!GameModeValueManager.GetCurrentGameModeValue().playerSpecificVariables.unlimitedResources && SceneStorages != null)
                 {
+                    mi_runningStorageCheck = true;
                     System.DateTime now = System.DateTime.UtcNow;
                     var storages = SceneStorages.Where(_o => _o.IsUpgraded).OrderByDescending(_o => _o.Data.Priority);
                     foreach (var storage in storages)
@@ -485,6 +497,8 @@ namespace pp.RaftMods.AutoSorter
                     DirtyInventories.Clear();
                     foreach (var storage in SceneStorages) storage.IsInventoryDirty = false;
                     mi_lastCheckDurationSeconds = (System.DateTime.UtcNow - now).TotalSeconds;
+                    mi_runningStorageCheck = false;
+                    CheckStorageQueues();
                 }
                 if (mi_lastCheckDurationSeconds < Config.CheckIntervalSeconds)
                 {
@@ -548,8 +562,13 @@ namespace pp.RaftMods.AutoSorter
             sceneStorage.AutoSorter = _storage.gameObject.AddComponent<CStorageBehaviour>();
             sceneStorage.StorageComponent.networkedIDBehaviour = sceneStorage.AutoSorter;
             sceneStorage.AutoSorter.Load(this, sceneStorage, mi_configDialog);
+            if (mi_runningStorageCheck)
+            {
+                mi_registerQueuedStorages.Enqueue(sceneStorage);
+                CUtil.LogD("Enqueued storage \"" + _storage.gameObject.name + "\" for register as we are currently running checks. Queued storages for register: " + mi_registerQueuedStorages.Count);
+                return;
+            }
             SceneStorages.Add(sceneStorage);
-
             CUtil.LogD("Registered storage \"" + _storage.gameObject.name + "\" Total storages: " + SceneStorages.Count);
         }
 
@@ -566,6 +585,13 @@ namespace pp.RaftMods.AutoSorter
         {
             if (Get == null) return; //mod is being unloaded
 
+            if (mi_runningStorageCheck)
+            {
+                mi_unregisterQueuedStorages.Enqueue(_storage);
+                CUtil.LogD("Enqueued storage \"" + _storage.StorageComponent.gameObject.name + "\" for unregister as we are currently running checks. Queued storages for unregister: " + mi_unregisterQueuedStorages.Count);
+                return;
+            }
+
             if (SceneStorages?.Contains(_storage) ?? false)
             {
                 SceneStorages.Remove(_storage);
@@ -573,7 +599,7 @@ namespace pp.RaftMods.AutoSorter
 
             if (SceneStorages != null)
             {
-                CUtil.LogD("Unregistered storage \"" + _storage.StorageComponent.gameObject.name + "\" Total storages: " + SceneStorages.Count);
+                CUtil.LogD("Unregistered storage \"" + (!_storage.StorageComponent ? "UNKNOWN (storage was destroyed)" : _storage.StorageComponent.gameObject.name) + "\" Total storages: " + (SceneStorages?.Count.ToString() ?? "No storages"));
             }
         }
 
@@ -605,6 +631,26 @@ namespace pp.RaftMods.AutoSorter
             while (mi_configDialog == null) yield return new WaitForEndOfFrame();
             if (!_storage.StorageComponent.IsOpen) yield break;
             mi_configDialog.Show(_storage);
+        }
+
+        private void CheckStorageQueues()
+        {
+            if(mi_registerQueuedStorages.Count > 0)
+            {
+                CUtil.LogD("Registering " + mi_registerQueuedStorages.Count + " queued storages now.");
+                while(mi_registerQueuedStorages.Count > 0)
+                {
+                    SceneStorages.Add(mi_registerQueuedStorages.Dequeue());
+                }
+            }
+            if(mi_unregisterQueuedStorages.Count > 0)
+            {
+                CUtil.LogD("Unregistering " + mi_unregisterQueuedStorages.Count + " queued storages now.");
+                while (mi_unregisterQueuedStorages.Count > 0)
+                {
+                    UnregisterStorage(mi_unregisterQueuedStorages.Dequeue());
+                }
+            }
         }
 
         #region PATCHES
@@ -793,7 +839,7 @@ namespace pp.RaftMods.AutoSorter
         [ConsoleCommand("asListStorages", "Lists all storages and their status.")]
         public static string ListStorages(string[] _args)
         {
-            return "### Tracked scene storages ###\n" + 
+            return $"### Tracked scene storages ({Get.SceneStorages?.Count ?? 0}) ###\n" + 
                 (
                     Get.SceneStorages == null ? 
                         "No registered storages in scene." :
