@@ -15,7 +15,7 @@ namespace pp.RaftMods.AutoSorter
     /// Handles upgrades/downgrades and item transfers as well as any other player interaction with the storage.
     /// </summary>
     [DisallowMultipleComponent] //disallow to really make sure we never get into the situation of components being added twice on mod reload.
-    public class CStorageBehaviour : MonoBehaviour_ID_Network
+    public class CStorageBehaviour : MonoBehaviour_Network
     {
         public Network_Player LocalPlayer => mi_localPlayer;
         public CSceneStorage SceneStorage => mi_sceneStorage;
@@ -143,7 +143,7 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         /// <param name="_msg">The DTO object sent along the network message.</param>
         /// <param name="_remoteID">The steam ID of the player that sent the network message.</param>
-        public void OnNetworkMessageReceived(CDTO _msg, CSteamID _remoteID)
+        public void OnNetworkMessageReceived(CDTO _msg, Network_UserId _remoteID)
         {
             if (!mi_loaded)
             {
@@ -256,7 +256,7 @@ namespace pp.RaftMods.AutoSorter
             }
         } 
 
-        protected override void OnDestroy()
+        public override void OnDestroy()
         {
             base.OnDestroy();
 

@@ -2,7 +2,6 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Web;
 using AutoSorter.Manager;
 using HarmonyLib;
 using HMLLibrary;
@@ -24,7 +23,7 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         private static CAutoSorter Get = null;
 
-        public const string VERSION                                 = "1.5.0";
+        public const string VERSION                                 = "1.4.3";
         public const string MOD_NAME                                = "AutoSorter";
         private const string MOD_NAMESPACE                          = "pp.RaftMods." + MOD_NAME;
 
@@ -176,9 +175,9 @@ namespace pp.RaftMods.AutoSorter
         /// <summary>
         /// Called whenever the world is unloaded while transitioning from the world to the main menu.
         /// </summary>
-        public override void WorldEvent_WorldUnloaded()
+        public override void Event_ReturnToMainMenu()
         {
-            base.WorldEvent_WorldUnloaded();
+            base.Event_ReturnToMainMenu();
 
             mi_checkChests = false;
             StopAllCoroutines();
@@ -427,7 +426,7 @@ namespace pp.RaftMods.AutoSorter
             private static void AddItem(Inventory __instance, ItemInstance itemInstance, bool dropIfFull = true) => Get.mi_storageManager.OnInventoryChanged(__instance);
 
             [HarmonyPrefix][HarmonyPatch("MoveItem")]
-            private static void MoveItem(Inventory __instance, Slot slot, UnityEngine.EventSystems.PointerEventData eventData)
+            private static void MoveItem(Inventory __instance, Slot slot, UnityEngine.EventSystems.PointerEventData.InputButton button)
             {
                 if (slot == null || slot.IsEmpty || __instance.secondInventory == null) return; //if items are moved within the player inventory, ignore.
 

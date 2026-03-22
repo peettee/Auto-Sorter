@@ -33,12 +33,12 @@ namespace AutoSorter.Manager
 
         public static void UnregisterNetworkBehaviour(CStorageBehaviour _behaviour)
         {
-            mi_registeredNetworkBehaviours.Remove(_behaviour.ObjectIndex);
+            mi_registeredNetworkBehaviours.Remove(_behaviour.BehaviourIndex);
         }
 
-        public static void SendTo(CDTO _object, CSteamID _id)
+        public static void SendTo(CDTO _object, Network_UserId _id)
         {
-            CUtil.LogD("Sending " + _object.Type + " to " + _id.m_SteamID + ".");
+            CUtil.LogD("Sending " + _object.Type + " to " + _id.Id + ".");
             mi_network.SendP2P(_id, CreateCarrierDTO(_object), EP2PSend.k_EP2PSendReliable, NetworkChannel.Channel_Game);
         }
 
@@ -79,80 +79,67 @@ namespace AutoSorter.Manager
                                     JsonConvert.SerializeObject(_object));
         }
 
-        [HarmonyPatch(typeof(NetworkUpdateManager), "Deserialize")]
-        private class CHarmonyPatch_NetworkUpdateManager_Deserialize
+        [HarmonyPatch(typeof(NetworkUpdateManager), "DeserializeSingleMessage")]
+        private class CHarmonyPatch_NetworkUpdateManager_DeserializeSingleMessage
         {
             [HarmonyPrefix]
-            private static bool Deserialize(Packet_Multiple packet, CSteamID remoteID)
+            private static bool DeserializeSingleMessage(Message msg, Network_UserId remoteID)
             {
-                List<Message> resultMessages = packet.messages.ToList();
-                List<Message> messages = packet.messages.ToList();
-
-                foreach (Message package in messages)
+                if (msg.t > mi_modMessagesCeil || msg.t < mi_modMessagesFloor)
                 {
-                    if (package.t > mi_modMessagesCeil || package.t < mi_modMessagesFloor)
-                    {
-                        continue; //this is a message type not from this mod, ignore this package.
-                    }
-
-                    var inventoryUpdate = package as Message_Storage_Close;
-                    var msg = package as Message_InitiateConnection;
-                    if (msg == null && inventoryUpdate == null)
-                    {
-                        CUtil.LogW("Invalid auto-sorter mod message received. Make sure all connected players use the same mod version.");
-                        continue;
-                    }
-
-                    resultMessages.Remove(package);
-
-                    try
-                    {
-                        if (inventoryUpdate != null)
-                        {
-                            if (!mi_registeredNetworkBehaviours.ContainsKey(inventoryUpdate.storageObjectIndex))
-                            {
-                                CUtil.LogW("No receiver with ID " + inventoryUpdate.storageObjectIndex + " found.");
-                                continue;
-                            }
-                            mi_registeredNetworkBehaviours[inventoryUpdate.storageObjectIndex].OnInventoryUpdateReceived(inventoryUpdate);
-                            continue;
-                        }
-
-                        CDTO modMessage = JsonConvert.DeserializeObject<CDTO>(msg.password);
-                        if (modMessage == null)
-                        {
-                            CUtil.LogW("Invalid network message received. Update the AutoSorter mod or make sure all connected players use the same version.");
-                            continue;
-                        }
-
-                        if (!mi_registeredNetworkBehaviours.ContainsKey(modMessage.ObjectIndex))
-                        {
-                            CUtil.LogW("No receiver with ID " + modMessage.ObjectIndex + " found.");
-                            continue;
-                        }
-
-                        if (modMessage.Info != null)
-                        {
-                            modMessage.Info.OnAfterDeserialize();
-                        }
-
-                        CUtil.LogD($"Received {modMessage.Type}({package.t}) message from \"{remoteID}\".");
-                        mi_registeredNetworkBehaviours[modMessage.ObjectIndex].OnNetworkMessageReceived(modMessage, remoteID);
-                    }
-                    catch (System.Exception _e)
-                    {
-                        CUtil.LogW($"Failed to read mod network message ({package.Type}) as {(Raft_Network.IsHost ? "host" : "client")}. You or one of your fellow players might have to update the mod.");
-                        CUtil.LogD(_e.Message);
-                        CUtil.LogD(_e.StackTrace);
-                    }
+                    return true; //this is a message type not from this mod, ignore this package.
                 }
 
-                if (resultMessages.Count == 0) return false; //no packages left, nothing todo. Dont even call the vanilla method
+                var inventoryUpdate = msg as Message_Storage_Close;
+                var genericMsg = msg as Message_InitiateConnection;
+                if (genericMsg == null && inventoryUpdate == null)
+                {
+                    CUtil.LogW("Invalid auto-sorter mod message received. Make sure all connected players use the same mod version.");
+                    return false;
+                }
 
-                //we remove all custom messages from the provided package and reassign the modified list so it is passed to the vanilla method.
-                //this is to make sure we dont lose any vanilla packages
-                packet.messages = resultMessages.ToArray();
-                return true; //nothing for the mod left to do here, let the vanilla behaviour take over
+                try
+                {
+                    if (inventoryUpdate != null)
+                    {
+                        if (!mi_registeredNetworkBehaviours.ContainsKey(inventoryUpdate.storageObjectIndex))
+                        {
+                            CUtil.LogW("No receiver with ID " + inventoryUpdate.storageObjectIndex + " found.");
+                            return false;
+                        }
+                        mi_registeredNetworkBehaviours[inventoryUpdate.storageObjectIndex].OnInventoryUpdateReceived(inventoryUpdate);
+                        return false;
+                    }
+
+                    CDTO modMessage = JsonConvert.DeserializeObject<CDTO>(genericMsg.password);
+                    if (modMessage == null)
+                    {
+                        CUtil.LogW("Invalid network message received. Update the AutoSorter mod or make sure all connected players use the same version.");
+                        return false;
+                    }
+
+                    if (!mi_registeredNetworkBehaviours.ContainsKey(modMessage.ObjectIndex))
+                    {
+                        CUtil.LogW("No receiver with ID " + modMessage.ObjectIndex + " found.");
+                        return false;
+                    }
+
+                    if (modMessage.Info != null)
+                    {
+                        modMessage.Info.OnAfterDeserialize();
+                    }
+
+                    CUtil.LogD($"Received {modMessage.Type}({msg.t}) message from \"{remoteID}\".");
+                    mi_registeredNetworkBehaviours[modMessage.ObjectIndex].OnNetworkMessageReceived(modMessage, remoteID);
+                }
+                catch (System.Exception _e)
+                {
+                    CUtil.LogW($"Failed to read mod network message ({msg.Type}) as {(Raft_Network.IsHost ? "host" : "client")}. You or one of your fellow players might have to update the mod.");
+                    CUtil.LogD(_e.Message);
+                    CUtil.LogD(_e.StackTrace);
+                }
+
+                return false;
             }
         }
     }

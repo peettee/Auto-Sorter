@@ -4,3 +4,4 @@ obj/
 *.rplugin
 /.vs/
 /assets_backup
+/packages/
