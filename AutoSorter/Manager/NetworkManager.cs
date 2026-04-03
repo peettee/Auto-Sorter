@@ -58,22 +58,34 @@ namespace AutoSorter.Manager
             mi_registeredNetworkBehaviours.Add(_behaviour.ObjectIndex, _behaviour);
         }
 
-        public bool OnNetworkMessage(CDTO msg, Network_UserId remoteID)
+        public bool OnNetworkMessage(object rawMsg, Network_UserId remoteID)
         {
-            if (!mi_registeredNetworkBehaviours.TryGetValue(msg.ObjectIndex, out CStorageBehaviour storageBehaviour))
+            if (!RAPI.IsCurrentSceneGame())
+                return true;
+
+            if (rawMsg == null)
+                return false;
+
+            if (!(rawMsg is CDTO netMessage))
             {
-                CUtil.LogW($"No receiver with ID {msg.ObjectIndex} found.");
+                CUtil.LogW($"Unknown net message \"{rawMsg.GetType().Name}\" received");
                 return true;
             }
 
-            CUtil.LogD($"Received {msg.Type}({msg.ObjectIndex}) message from \"{remoteID}\".");
+            if (!mi_registeredNetworkBehaviours.TryGetValue(netMessage.ObjectIndex, out CStorageBehaviour storageBehaviour))
+            {
+                CUtil.LogW($"No receiver with ID {netMessage.ObjectIndex} found.");
+                return true;
+            }
+
+            CUtil.LogD($"Received {netMessage.Type}({netMessage.ObjectIndex}) message from \"{remoteID}\".");
             try
             {
-                storageBehaviour.OnNetworkMessageReceived(msg, remoteID);
+                storageBehaviour.OnNetworkMessageReceived(netMessage, remoteID);
             }
             catch (System.Exception _e)
             {
-                CUtil.LogW($"Failed to read mod network message ({msg.Type}) as {(Raft_Network.IsHost ? "host" : "client")}. You or one of your fellow players might have to update the mod.");
+                CUtil.LogW($"Failed to read mod network message ({netMessage.Type}) as {(Raft_Network.IsHost ? "host" : "client")}. You or one of your fellow players might have to update the mod.");
                 CUtil.LogD(_e.Message);
                 CUtil.LogD(_e.StackTrace);
             }
