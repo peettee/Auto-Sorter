@@ -108,8 +108,9 @@ namespace pp.RaftMods.AutoSorter
                 {
                     if ((storage.AdditionalData != null && storage.AdditionalData.Ignore) ||
                         storage == mi_sceneStorage ||
+                        storage.StorageComponent.IsOpen ||
                         storage.IsInventoryDirty) continue; //if the inventory has been altered, wait for the next cycle to transfer items from it so there are no issues with priority.
-
+                    
                     totalItemsTransfered = 0;
                     targetInventory = storage.StorageComponent.GetInventoryReference();
 
@@ -133,7 +134,7 @@ namespace pp.RaftMods.AutoSorter
                         yield return new WaitForEndOfFrame();
                     }
 
-                    if(totalItemsTransfered > 0)
+                    if (totalItemsTransfered > 0)
                     {
                         mi_network.BroadcastInventoryState(storage.AutoSorter);
                         mi_network.BroadcastInventoryState(this);
@@ -211,7 +212,7 @@ namespace pp.RaftMods.AutoSorter
         /// The message makes sure that storage inventories is kept in sync for all players when auto-sorters transfer items.
         /// Usually this message is sent by Raft whenever a user closes a storage, the mod also sends it whenever the auto-sorter changes inventories and updates this storage's inventory.
         /// </summary>
-        /// <param name="_netMessage">The <see cref="Message_Storage_Close"/> message sent by a clients auto-sorter on item transfer.</param>
+        /// <param name="_netMessage">The <see cref="CDTOInventoryUpdate"/> message sent by a clients auto-sorter on item transfer.</param>
         public void OnInventoryUpdateReceived(CDTOInventoryUpdate _netMessage)
         {
             CUtil.LogD($"Inventory update received for {_netMessage.ObjectIndex}");

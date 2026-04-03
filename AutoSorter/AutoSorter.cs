@@ -197,21 +197,7 @@ namespace pp.RaftMods.AutoSorter
         }
 
         public override bool OnNetworkMessage(object message, Network_UserId from, string modslug)
-        {
-            if (!RAPI.IsCurrentSceneGame())
-                return false;
-
-            if (message == null)
-                return false;
-
-            if (!(message is CDTO netMessage))
-            {
-                CUtil.LogW($"Unknown net message \"{message.GetType().Name}\" received");
-                return base.OnNetworkMessage(message, from, modslug);
-            }
-
-            return mi_network.OnNetworkMessage(netMessage, from);
-        }
+            => mi_network.OnNetworkMessage(message, from);
         #endregion
 
         public void SaveConfig()
@@ -434,30 +420,10 @@ namespace pp.RaftMods.AutoSorter
         [HarmonyPatch(typeof(Inventory))]
         private class CHarmonyPatch_Inventory
         {
-            [HarmonyPrefix]
-            [HarmonyPatch("AddItem", typeof(string), typeof(int))]
-            private static void AddItem(Inventory __instance, string uniqueItemName, int amount) => Get.mi_storageManager.OnInventoryChanged(__instance);
-
-            [HarmonyPrefix][HarmonyPatch("AddItem", typeof(string), typeof(Slot), typeof(int))]
-            private static void AddItem(Inventory __instance, string uniqueItemName, Slot slot, int amount) => Get.mi_storageManager.OnInventoryChanged(__instance);
-
-            [HarmonyPrefix][HarmonyPatch("AddItem", typeof(ItemInstance), typeof(bool))]
-            private static void AddItem(Inventory __instance, ItemInstance itemInstance, bool dropIfFull = true) => Get.mi_storageManager.OnInventoryChanged(__instance);
-
-            [HarmonyPrefix][HarmonyPatch("MoveItem")]
-            private static void MoveItem(Inventory __instance, Slot slot, UnityEngine.EventSystems.PointerEventData.InputButton button)
-            {
-                if (slot == null || slot.IsEmpty || __instance.secondInventory == null) return; //if items are moved within the player inventory, ignore.
-
-                Slot movedToSlot = Traverse.Create<Inventory>().Field("toSlot").GetValue<Slot>();
-                Inventory movedTo = movedToSlot != null ? Traverse.Create(movedToSlot).Field("inventory").GetValue<Inventory>() : null;
-                if (movedTo == null || movedTo == __instance) return; //if items are moved within the same inventory, ignore.
-                Get.mi_storageManager.OnInventoryChanged(movedTo);
-                Get.mi_storageManager.OnInventoryChanged(__instance);
-            }
-
-            [HarmonyPrefix][HarmonyPatch("SetSlotsFromRGD")]
-            private static void SetSlotsFromRGD(Inventory __instance, RGD_Slot[] slots) => Get.mi_storageManager.SetStorageInventoryDirty(__instance);
+            [HarmonyPostfix]
+            [HarmonyPatch("SetSlotsFromRGD")]
+            private static void SetSlotsFromRGD(Inventory __instance, RGD_Slot[] slots)
+                => Get.mi_storageManager.SetStorageInventoryDirty(__instance);
         }
         #endregion
 
@@ -470,7 +436,7 @@ namespace pp.RaftMods.AutoSorter
                     Get.mi_storageManager.SceneStorages.Count == 0 ? 
                         "No registered storages in scene." :
                         "- " + string.Join("\n- ",
-                            Get.mi_storageManager.SceneStorages.Values.Select(_o => $"\"{_o.StorageComponent.gameObject.name}\" Dirty: {_o.IsInventoryDirty} AutoSorter: {_o.IsUpgraded} " +
+                            Get.mi_storageManager.SceneStorages.Values.Select(_o => $"\"{_o.StorageComponent.gameObject.name}\" IsOpen: {_o.StorageComponent.IsOpen} Dirty: {_o.IsInventoryDirty} AutoSorter: {_o.IsUpgraded} " +
                                 $"{(_o.IsUpgraded ? $" Priority: {_o.Data.Priority} Filters: {_o.Data.Filters.Count}" : "")}" +
                                 $"{(_o.AdditionalData != null ? " Ignore: " + _o.AdditionalData.Ignore : "")}")));
         }

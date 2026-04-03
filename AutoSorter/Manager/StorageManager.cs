@@ -119,24 +119,6 @@ namespace AutoSorter.Manager
             storageForInventory.IsInventoryDirty = true;
             CUtil.LogD($"Inventory for storage \"{storageForInventory.AutoSorter.name}\"({storageForInventory.ObjectIndex}) is marked as dirty.");
         }
-        
-        public void OnInventoryChanged(Inventory _inventory)
-        {
-            if (_inventory is PlayerInventory) return;
-            var storageForInventory = SceneStorages.Values.FirstOrDefault(_o => _o.AutoSorter.Inventory == _inventory);
-            if (storageForInventory == null) return;
-
-            if (Raft_Network.IsHost)
-            {
-                storageForInventory.IsInventoryDirty = true;
-                CUtil.LogD($"Inventory for storage \"{storageForInventory.AutoSorter.name}\"({storageForInventory.ObjectIndex}) is marked as dirty.");
-            }
-            else
-            {
-                mi_network.BroadcastInventoryState(storageForInventory.AutoSorter);
-                CUtil.LogD($"Inventory for storage \"{storageForInventory.AutoSorter.name}\"({storageForInventory.ObjectIndex}) changed.");
-            }
-        }
 
         private void FlushStorageQueues()
         {
