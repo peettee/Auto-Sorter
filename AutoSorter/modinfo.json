@@ -16,7 +16,11 @@
       "type": "checkbox",
       "name": "ChangeStorageColorOnUpgrade",
       "text": "change storage color on upgrade",
-      "default": true
+      "default": true,
+      "tooltip": [
+        "Determines whether the storage color changes whenever you upgrade a storage to an auto-sorter.",
+        "If you disable this, make sure you reload your world, so all storages get back to normal."
+      ]
     },
     {
       "type": "slider",
@@ -28,7 +32,11 @@
         "min": 5,
         "max": 100,
         "decimals": 0
-      }
+      },
+      "tooltip": [
+        "The maximum amount of items displayed in the manual mode item filter list.",
+        "Recreating those UI elements has a bit of a performance impact, so make sure you lower this value if you are having lags while opening the auto-sorter UI."
+      ]
     },
     {
       "type": "slider",
@@ -40,7 +48,11 @@
         "min": 0,
         "max": 1,
         "decimals": 0
-      }
+      },
+      "tooltip": [
+        "The multiplier that is applied when determining how many items the user gets back on a downgrade.",
+        "This is a percentage value 100% (you will get all items back), 0% (you won't receive any items back on downgrade)."
+      ]
     },
     {
       "type": "slider",
@@ -52,7 +64,12 @@
         "min": 1,
         "max": 10,
         "decimals": 0
-      }
+      },
+      "tooltip": [
+        "The interval in seconds in which all auto-sorters are checked and transfer items.",
+        "If you have a lot of storages on your raft, you might want to increase this value to make sure everything still runs smoothly.",
+        "Just keep in mind that it can take up to the set interval for items to be transferred."
+      ]
     },
     {
       "type": "checkbox",
