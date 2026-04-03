@@ -35,4 +35,17 @@ namespace pp.RaftMods.AutoSorter.Protocol
             ObjectIndex = _objectIndex;
         }
     }
+
+    [System.Serializable]
+    public class CDTOInventoryUpdate : CDTO
+    {
+        public RGD_Slot[] Slots;
+
+        public CDTOInventoryUpdate() {}
+        public CDTOInventoryUpdate(uint _objectIndex, RGD_Slot[] _slots) 
+            : base(EStorageRequestType.STORAGE_INVENTORY_UPDATE, _objectIndex) 
+        {
+            Slots = _slots;
+        }
+    }
 }

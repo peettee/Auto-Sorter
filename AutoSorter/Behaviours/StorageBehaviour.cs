@@ -5,7 +5,6 @@ using AutoSorter.Manager;
 using FMODUnity;
 using HarmonyLib;
 using pp.RaftMods.AutoSorter.Protocol;
-using Steamworks;
 using UnityEngine;
 
 namespace pp.RaftMods.AutoSorter
@@ -21,10 +20,12 @@ namespace pp.RaftMods.AutoSorter
         public CSceneStorage SceneStorage => mi_sceneStorage;
         public Inventory Inventory => mi_inventory;
 
+        public RGD_Slot[] Slots => SceneStorage.Slots;
+
         private bool HasInventorySpaceLeft => mi_inventory?.allSlots.Any(_o => _o.active && !_o.locked && !_o.StackIsFull()) ?? false;
 
         private CStorageManager mi_storageManager;
-        private Raft_Network mi_network;
+        private CNetwork mi_network;
         private Network_Player mi_localPlayer;
 
         private CSceneStorage mi_sceneStorage;
@@ -43,21 +44,24 @@ namespace pp.RaftMods.AutoSorter
         /// <param name="_mod">A handle to the mod object initializing this storage behaviour.</param>
         /// <param name="_storage">Reference to the scene storage which contains this storage behaviour.</param>
         /// <param name="_configDialog">Reference to the auto-sorter UI.</param>
-        public void Load(CStorageManager _storageManager, CSceneStorage _storage)
+        public void Load(CStorageManager _storageManager, CSceneStorage _storage, CNetwork _network)
         {
             mi_storageManager       = _storageManager;
+            mi_network              = _network;
             mi_sceneStorage         = _storage;
+
             mi_inventory            = mi_sceneStorage.StorageComponent.GetInventoryReference();
-            mi_network              = ComponentManager<Raft_Network>.Value;
-            mi_localPlayer          = mi_network.GetLocalPlayer();
+            mi_localPlayer          = ComponentManager<Raft_Network>.Value.GetLocalPlayer();
+
             //use our block objects index so we receive RPC calls
             //need to use an existing block index as clients/host need to be aware of it
             ObjectIndex             = mi_sceneStorage.StorageComponent.ObjectIndex;
-            CNetwork.RegisterNetworkBehaviour(this);
+
+            mi_network.RegisterNetworkBehaviour(this);
 
             if (!Raft_Network.IsHost)
             {
-                CNetwork.SendTo(new CDTO(EStorageRequestType.REQUEST_STATE, ObjectIndex), mi_network.HostID);
+                mi_network.SendToHost(new CDTO(EStorageRequestType.REQUEST_STATE, ObjectIndex));
             }
             else
             {
@@ -131,8 +135,8 @@ namespace pp.RaftMods.AutoSorter
 
                     if(totalItemsTransfered > 0)
                     {
-                        CNetwork.BroadcastInventoryState(storage.AutoSorter);
-                        CNetwork.BroadcastInventoryState(this);
+                        mi_network.BroadcastInventoryState(storage.AutoSorter);
+                        mi_network.BroadcastInventoryState(this);
                     }
                 }
             }
@@ -153,12 +157,20 @@ namespace pp.RaftMods.AutoSorter
 
             switch (_msg.Type)
             {
+                case EStorageRequestType.STORAGE_INVENTORY_UPDATE:
+                    if (!(_msg is CDTOInventoryUpdate inventoryUpdate))
+                    {
+                        CUtil.LogD("Received inventory update but failed to deserialize to proper type. Dropping message...");
+                        return;
+                    }
+                    OnInventoryUpdateReceived(inventoryUpdate);
+                    break;
                 case EStorageRequestType.REQUEST_STATE:  //a client block requested this blocks state, send it back
                     if (Raft_Network.IsHost)
                     {
                         if (!mi_sceneStorage.IsUpgraded && mi_sceneStorage.AdditionalData == null) return;
 
-                        CNetwork.SendTo(new CDTO(EStorageRequestType.RESPOND_STATE, ObjectIndex) { Info = mi_sceneStorage.Data, AdditionalInfo = mi_sceneStorage.AdditionalData }, _remoteID);
+                        mi_network.SendTo(new CDTO(EStorageRequestType.RESPOND_STATE, ObjectIndex) { Info = mi_sceneStorage.Data, AdditionalInfo = mi_sceneStorage.AdditionalData }, _remoteID);
                     }
                     break;
                 case EStorageRequestType.RESPOND_STATE:
@@ -200,10 +212,10 @@ namespace pp.RaftMods.AutoSorter
         /// Usually this message is sent by Raft whenever a user closes a storage, the mod also sends it whenever the auto-sorter changes inventories and updates this storage's inventory.
         /// </summary>
         /// <param name="_netMessage">The <see cref="Message_Storage_Close"/> message sent by a clients auto-sorter on item transfer.</param>
-        public void OnInventoryUpdateReceived(Message_Storage_Close _netMessage)
+        public void OnInventoryUpdateReceived(CDTOInventoryUpdate _netMessage)
         {
-            CUtil.LogD("Inventory update received for " + _netMessage.storageObjectIndex);
-            mi_inventory.SetSlotsFromRGD(_netMessage.slots);
+            CUtil.LogD($"Inventory update received for {_netMessage.ObjectIndex}");
+            mi_inventory.SetSlotsFromRGD(_netMessage.Slots);
         }
 
         /// <summary>
@@ -260,7 +272,7 @@ namespace pp.RaftMods.AutoSorter
         {
             base.OnDestroy();
 
-            CNetwork.UnregisterNetworkBehaviour(this);
+            mi_network.UnregisterNetworkBehaviour(this);
 
             if (mi_customTexture)
             {
@@ -363,7 +375,7 @@ namespace pp.RaftMods.AutoSorter
 
         private void SendUpgradeState(bool _isUpgraded)
         {
-            CNetwork.Broadcast(new CDTO(EStorageRequestType.UPGRADE, ObjectIndex) { Upgrade = _isUpgraded }); ;
+            mi_network.Broadcast(new CDTO(EStorageRequestType.UPGRADE, ObjectIndex) { Upgrade = _isUpgraded }); ;
         }
     
         private bool CheckIsEligibleToTransfer(ItemInstance _item, CSceneStorage _storage, out int _itemRestriction) //make sure if we are transferring between auto-sorters we use priorities to prevent item loops.

@@ -65,6 +65,7 @@ namespace pp.RaftMods.AutoSorter
         private bool mi_isHidden;
 
         private CAutoSorter mi_mod;
+        private CNetwork mi_network;
         private EAdditionalItemFilterType mi_additionalItemFilter;
 
         private void Awake()
@@ -154,10 +155,11 @@ namespace pp.RaftMods.AutoSorter
         /// Sets the item prefab reference-
         /// </summary>
         /// <param name="_itemPrefab"></param>
-        public void Load(CAutoSorter _mod, GameObject _itemPrefab)
+        public void Load(CAutoSorter _mod, GameObject _itemPrefab, CNetwork _network)
         {
             mi_mod = _mod;
             mi_itemAsset = _itemPrefab;
+            mi_network = _network;
         }
 
         /// <summary>
@@ -586,7 +588,7 @@ namespace pp.RaftMods.AutoSorter
             mi_mod.Sounds?.PlayUI_Click();
 
             mi_currentStorage.AdditionalData = new CGeneralStorageData(mi_currentStorage.AutoSorter.ObjectIndex, true);
-            CNetwork.Broadcast(new CDTO(EStorageRequestType.STORAGE_IGNORE_UPDATE, mi_currentStorage.AutoSorter.ObjectIndex) { AdditionalInfo = mi_currentStorage.AdditionalData });
+            mi_network.Broadcast(new CDTO(EStorageRequestType.STORAGE_IGNORE_UPDATE, mi_currentStorage.AutoSorter.ObjectIndex) { AdditionalInfo = mi_currentStorage.AdditionalData });
 
             mi_includeButton.gameObject.SetActive(true);
             mi_ignoreButton.gameObject.SetActive(false);
@@ -598,7 +600,7 @@ namespace pp.RaftMods.AutoSorter
 
             mi_currentStorage.AdditionalData = null;
 
-            CNetwork.Broadcast(new CDTO(EStorageRequestType.STORAGE_IGNORE_UPDATE, mi_currentStorage.AutoSorter.ObjectIndex) { AdditionalInfo = null });
+            mi_network.Broadcast(new CDTO(EStorageRequestType.STORAGE_IGNORE_UPDATE, mi_currentStorage.AutoSorter.ObjectIndex) { AdditionalInfo = null });
 
             mi_includeButton.gameObject.SetActive(false);
             mi_ignoreButton.gameObject.SetActive(true);

@@ -1,13 +1,13 @@
-﻿using System.Collections;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using AutoSorter.Manager;
+﻿using AutoSorter.Manager;
 using HarmonyLib;
 using HMLLibrary;
 using Newtonsoft.Json;
 using pp.RaftMods.AutoSorter.Protocol;
 using RaftModLoader;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace pp.RaftMods.AutoSorter
@@ -23,7 +23,6 @@ namespace pp.RaftMods.AutoSorter
         /// </summary>
         private static CAutoSorter Get = null;
 
-        public const string VERSION                                 = "1.4.3";
         public const string MOD_NAME                                = "AutoSorter";
         private const string MOD_NAMESPACE                          = "pp.RaftMods." + MOD_NAME;
 
@@ -69,6 +68,7 @@ namespace pp.RaftMods.AutoSorter
         private CUISorterConfigDialog mi_configDialog;
 
         private CStorageManager mi_storageManager;
+        private CNetwork mi_network;
 
         #region ENGINE_CALLBACKS
         /// <summary>
@@ -114,10 +114,11 @@ namespace pp.RaftMods.AutoSorter
                 CUtil.LogW("Failed to get sound manager on mod load.");
             }
 
-            mi_storageManager = new CStorageManager(ModDataDirectory);
+            mi_network = new CNetwork(this);
+            mi_storageManager = new CStorageManager(ModDataDirectory, mi_network);
             mi_storageManager.LoadStorageData();
 
-            CUtil.Log($"{MOD_NAME} v. {VERSION} loaded.");
+            CUtil.Log($"{MOD_NAME} v. {version} loaded.");
         }
 
         private void OnDestroy()
@@ -127,7 +128,7 @@ namespace pp.RaftMods.AutoSorter
             StopAllCoroutines();
             mi_storageManager.Cleanup();
 
-            CNetwork.Clear();
+            mi_network.Clear();
 
             if (mi_harmony != null)
             {
@@ -183,7 +184,7 @@ namespace pp.RaftMods.AutoSorter
             StopAllCoroutines();
 
             mi_storageManager.Cleanup();
-            CNetwork.Clear();
+            mi_network.Clear();
         }
 
         /// <summary>
@@ -193,6 +194,23 @@ namespace pp.RaftMods.AutoSorter
         {
             base.WorldEvent_WorldSaved();
             mi_storageManager.SaveStorageData();
+        }
+
+        public override bool OnNetworkMessage(object message, Network_UserId from, string modslug)
+        {
+            if (!RAPI.IsCurrentSceneGame())
+                return false;
+
+            if (message == null)
+                return false;
+
+            if (!(message is CDTO netMessage))
+            {
+                CUtil.LogW($"Unknown net message \"{message.GetType().Name}\" received");
+                return base.OnNetworkMessage(message, from, modslug);
+            }
+
+            return mi_network.OnNetworkMessage(netMessage, from);
         }
         #endregion
 
@@ -311,10 +329,11 @@ namespace pp.RaftMods.AutoSorter
 
             Transform configDialogRoot = mi_uiRoot.transform.Find("ConfigDialog");
             mi_configDialog = configDialogRoot.gameObject.AddComponent<CUISorterConfigDialog>();
-            mi_configDialog.Load(this, itemAsset);
+            mi_configDialog.Load(this, itemAsset, mi_network);
 
             Transform dialogRoot = mi_uiRoot.transform.Find("Dialog");
             Dialog = dialogRoot.gameObject.AddComponent<CUIDialog>();
+            Dialog.Load(this);
             CUtil.LogD("Auto-sorter UI loaded!");
         }
 
@@ -408,7 +427,7 @@ namespace pp.RaftMods.AutoSorter
                     return;
                 }
 
-                CNetwork.Broadcast(new CDTO(EStorageRequestType.STORAGE_DATA_UPDATE, storage.AutoSorter.ObjectIndex) { Info = storage.Data });
+                Get.mi_network.Broadcast(new CDTO(EStorageRequestType.STORAGE_DATA_UPDATE, storage.AutoSorter.ObjectIndex) { Info = storage.Data });
             }
         }
 

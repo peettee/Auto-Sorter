@@ -1,7 +1,5 @@
-﻿using HarmonyLib;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using pp.RaftMods.AutoSorter;
-using pp.RaftMods.AutoSorter.Protocol;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -37,11 +35,13 @@ namespace AutoSorter.Manager
         private readonly Queue<CSceneStorage> mi_registerQueuedStorages = new Queue<CSceneStorage>();
         private readonly Queue<CSceneStorage> mi_unregisterQueuedStorages = new Queue<CSceneStorage>();
         private readonly string m_modDataDirectory;
+        private readonly CNetwork mi_network;
         private bool mi_deferStorageRegister;
 
-        public CStorageManager(string _modDataDirectory)
+        public CStorageManager(string _modDataDirectory, CNetwork _network)
         {
             m_modDataDirectory = _modDataDirectory;
+            mi_network = _network;
         }
 
         public IEnumerator UpdateStorages()
@@ -99,7 +99,7 @@ namespace AutoSorter.Manager
             sceneStorage.StorageComponent = _storage;
             sceneStorage.AutoSorter = _storage.gameObject.AddComponent<CStorageBehaviour>();
             sceneStorage.StorageComponent.networkedIDBehaviour = sceneStorage.AutoSorter;
-            sceneStorage.AutoSorter.Load(this, sceneStorage);
+            sceneStorage.AutoSorter.Load(this, sceneStorage, mi_network);
             if (mi_deferStorageRegister)
             {
                 mi_registerQueuedStorages.Enqueue(sceneStorage);
@@ -133,7 +133,7 @@ namespace AutoSorter.Manager
             }
             else
             {
-                CNetwork.BroadcastInventoryState(storageForInventory.AutoSorter);
+                mi_network.BroadcastInventoryState(storageForInventory.AutoSorter);
                 CUtil.LogD($"Inventory for storage \"{storageForInventory.AutoSorter.name}\"({storageForInventory.ObjectIndex}) changed.");
             }
         }
@@ -206,7 +206,7 @@ namespace AutoSorter.Manager
                     }
                 }
             }
-            catch (System.Exception _e)
+            catch (Exception _e)
             {
                 CUtil.LogW("Failed to load saved mod data: " + _e.Message + ". Storage data wont be loaded.");
                 CUtil.LogD(_e.StackTrace);
