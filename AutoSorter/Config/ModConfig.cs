@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.Runtime.CompilerServices;
 
 namespace pp.RaftMods.AutoSorter
 {
@@ -54,16 +55,21 @@ namespace pp.RaftMods.AutoSorter
         }
 
         #region EXTRA_SETTINGS_API_CALLBACKS
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static bool ExtraSettingsAPI_GetCheckboxState(string _settingName) => true;
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static float ExtraSettingsAPI_GetSliderValue(string _settingName) => 0f;
 
         public static bool ExtraSettingsAPI_Loaded = false;
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public void ExtraSettingsAPI_Load()
         {
             ReloadSettings();
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public void ExtraSettingsAPI_SettingsClose() => ReloadSettings();
         #endregion
 
