@@ -73,6 +73,15 @@
     },
     {
       "type": "checkbox",
+      "name": "DisableSounds",
+      "text": "disable sorter sounds",
+      "default": false,
+      "tooltip": [
+        "If enabled sorters will not play a sound when items are added to their inventory."
+      ]
+    },
+    {
+      "type": "checkbox",
       "name": "Debug",
       "default": false
     }

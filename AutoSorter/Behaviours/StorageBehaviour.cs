@@ -1,10 +1,10 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using AutoSorter.Manager;
+﻿using AutoSorter.Manager;
 using FMODUnity;
 using HarmonyLib;
 using pp.RaftMods.AutoSorter.Protocol;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace pp.RaftMods.AutoSorter
@@ -24,6 +24,7 @@ namespace pp.RaftMods.AutoSorter
 
         private bool HasInventorySpaceLeft => mi_inventory?.allSlots.Any(_o => _o.active && !_o.locked && !_o.StackIsFull()) ?? false;
 
+        private CAutoSorter mi_mod;
         private CStorageManager mi_storageManager;
         private CNetwork mi_network;
         private Network_Player mi_localPlayer;
@@ -44,8 +45,9 @@ namespace pp.RaftMods.AutoSorter
         /// <param name="_mod">A handle to the mod object initializing this storage behaviour.</param>
         /// <param name="_storage">Reference to the scene storage which contains this storage behaviour.</param>
         /// <param name="_configDialog">Reference to the auto-sorter UI.</param>
-        public void Load(CStorageManager _storageManager, CSceneStorage _storage, CNetwork _network)
+        public void Load(CAutoSorter _mod, CStorageManager _storageManager, CSceneStorage _storage, CNetwork _network)
         {
+            mi_mod                  = _mod;
             mi_storageManager       = _storageManager;
             mi_network              = _network;
             mi_sceneStorage         = _storage;
@@ -314,7 +316,8 @@ namespace pp.RaftMods.AutoSorter
             targetItemCount = Mathf.Min(targetItemCount, instance.Amount);
             instance.Amount = targetItemCount; //if target item count is larger than the actual amount in this slot, use the amount in slot otherwise the target count.
 
-            mi_inventory.AddItem(instance, false);
+            AddItemToInventory(mi_inventory, instance);
+
             _itemsTransfered = targetItemCount - instance.Amount; //determine how many items have been actually transferred
 
             CUtil.LogD($"Trying to add {targetItemCount} ({_itemsTransfered} actual) {_slot.itemInstance.UniqueName} to {mi_inventory.name} from {_targetInventory.name}");
@@ -330,6 +333,13 @@ namespace pp.RaftMods.AutoSorter
             }
 
             return true;
+        }
+
+        private void AddItemToInventory(Inventory _inventory, ItemInstance _item)
+        {
+            mi_mod.SuppressItemMoveSoundIfConfigured();
+            _inventory.AddItem(_item, false);
+            mi_mod.RestoreItemMoveSound();
         }
 
         private void UpdateStorageMaterials()

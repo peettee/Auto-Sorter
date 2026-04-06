@@ -34,12 +34,14 @@ namespace AutoSorter.Manager
 
         private readonly Queue<CSceneStorage> mi_registerQueuedStorages = new Queue<CSceneStorage>();
         private readonly Queue<CSceneStorage> mi_unregisterQueuedStorages = new Queue<CSceneStorage>();
+        private readonly CAutoSorter mi_mod;
         private readonly string m_modDataDirectory;
         private readonly CNetwork mi_network;
         private bool mi_deferStorageRegister;
 
-        public CStorageManager(string _modDataDirectory, CNetwork _network)
+        public CStorageManager(string _modDataDirectory, CNetwork _network, CAutoSorter _mod)
         {
+            mi_mod = _mod;
             m_modDataDirectory = _modDataDirectory;
             mi_network = _network;
         }
@@ -99,7 +101,7 @@ namespace AutoSorter.Manager
             sceneStorage.StorageComponent = _storage;
             sceneStorage.AutoSorter = _storage.gameObject.AddComponent<CStorageBehaviour>();
             sceneStorage.StorageComponent.networkedIDBehaviour = sceneStorage.AutoSorter;
-            sceneStorage.AutoSorter.Load(this, sceneStorage, mi_network);
+            sceneStorage.AutoSorter.Load(mi_mod, this, sceneStorage, mi_network);
             if (mi_deferStorageRegister)
             {
                 mi_registerQueuedStorages.Enqueue(sceneStorage);

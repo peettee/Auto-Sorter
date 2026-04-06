@@ -37,6 +37,10 @@ namespace pp.RaftMods.AutoSorter
         /// If true changes the storages color to red on upgrade. False will leave the color untouched.
         /// </summary>
         public bool ChangeStorageColorOnUpgrade;
+        /// <summary>
+        /// Disables the item move sounds when sorters add items to inventories
+        /// </summary>
+        public bool DisableSounds;
 
         public CModConfig()
         {
@@ -45,6 +49,7 @@ namespace pp.RaftMods.AutoSorter
             Debug                               = false;
             ChangeStorageColorOnUpgrade         = true;
             ReturnItemsOnDowngradeMultiplier    = 0.5f;
+            DisableSounds                       = false;
             UpgradeCosts                        = new[]
             {
                 new UpgradeCost("Plastic", 20),
@@ -80,6 +85,7 @@ namespace pp.RaftMods.AutoSorter
             Debug                               = ExtraSettingsAPI_GetCheckboxState(nameof(Debug));
             ReturnItemsOnDowngradeMultiplier    = ExtraSettingsAPI_GetSliderValue(nameof(ReturnItemsOnDowngradeMultiplier));
             ChangeStorageColorOnUpgrade         = ExtraSettingsAPI_GetCheckboxState(nameof(ChangeStorageColorOnUpgrade));
+            DisableSounds                       = ExtraSettingsAPI_GetCheckboxState(nameof(DisableSounds));
             CUtil.LogD("Settings reload!\n" + this);
         }
 
@@ -91,7 +97,8 @@ Debug: {Debug}
 InitialHelpShown: {InitialHelpShown}
 ReturnItems: {ReturnItemsOnDowngradeMultiplier}
 MaxSearchResults: {MaxSearchResultItems}
-ChangeColor: {ChangeStorageColorOnUpgrade}";
+ChangeColor: {ChangeStorageColorOnUpgrade}
+DisableSounds: {DisableSounds}";
         }
     }
 
@@ -131,6 +138,5 @@ ChangeColor: {ChangeStorageColorOnUpgrade}";
                 CUtil.LogW("Item amount on item \"" + Name + "\" in the config upgrade costs is invalid. Please check your config file.");
             }
         }
-
     }
 }

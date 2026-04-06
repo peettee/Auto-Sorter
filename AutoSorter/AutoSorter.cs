@@ -61,7 +61,7 @@ namespace pp.RaftMods.AutoSorter
         private Coroutine mi_chestRoutineHandle;
         private bool mi_checkChests;
         private double mi_lastCheckDurationSeconds;
-
+        private bool mi_suppressItemSound;
         private AssetBundle mi_bundle;
 
         private GameObject mi_uiRoot;
@@ -115,7 +115,7 @@ namespace pp.RaftMods.AutoSorter
             }
 
             mi_network = new CNetwork(this);
-            mi_storageManager = new CStorageManager(ModDataDirectory, mi_network);
+            mi_storageManager = new CStorageManager(ModDataDirectory, mi_network, this);
             mi_storageManager.LoadStorageData();
 
             CUtil.Log($"{MOD_NAME} v. {version} loaded.");
@@ -339,6 +339,18 @@ namespace pp.RaftMods.AutoSorter
             mi_configDialog.Show(_storage);
         }
 
+        public void SuppressItemMoveSoundIfConfigured()
+        {
+            if (!Config.DisableSounds)
+                return;
+            mi_suppressItemSound = true;
+        }
+
+        public void RestoreItemMoveSound()
+        {
+            mi_suppressItemSound = false;
+        }
+
         #region PATCHES
         [HarmonyPatch(typeof(BlockCreator), "CreateBlock")]
         private class CHarmonyPatch_BlockCreator_CreateBlock
@@ -424,6 +436,17 @@ namespace pp.RaftMods.AutoSorter
             [HarmonyPatch("SetSlotsFromRGD")]
             private static void SetSlotsFromRGD(Inventory __instance, RGD_Slot[] slots)
                 => Get.mi_storageManager.SetStorageInventoryDirty(__instance);
+        }
+
+        [HarmonyPatch(typeof(SoundManager))]
+        private class CHarmonyPatch_SoundManager
+        {
+            [HarmonyPrefix]
+            [HarmonyPatch("PlayUI_MoveItem")]
+            private static bool PlayUI_MoveItem(SoundManager __instance)
+            {
+                return !Get.mi_suppressItemSound;
+            }
         }
         #endregion
 
